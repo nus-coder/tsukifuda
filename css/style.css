@@ -217,6 +217,88 @@ body {
 .card-tooltip .t-name { color: var(--gold); font-weight: 800; }
 .card-tooltip .t-flavor { color: var(--dim); font-style: italic; margin-top: 4px; }
 
+/* ===== リッチ演出 ===== */
+
+/* 流れ星（タイトル画面） */
+.shooting-star {
+  position: absolute; top: var(--top, 15%); left: -80px;
+  width: 90px; height: 2px; pointer-events: none;
+  background: linear-gradient(90deg, transparent, #fff);
+  border-radius: 2px; opacity: 0;
+  animation: shoot 14s linear infinite; animation-delay: var(--delay, 0s);
+}
+@keyframes shoot {
+  0% { transform: translate(0, 0) rotate(8deg); opacity: 0; }
+  2% { opacity: .9; }
+  8% { transform: translate(110vw, 14vw) rotate(8deg); opacity: 0; }
+  100% { transform: translate(110vw, 14vw) rotate(8deg); opacity: 0; }
+}
+.title-moon { animation: moonBob 7s ease-in-out infinite; }
+@keyframes moonBob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+
+/* タイトルの戦績 */
+.title-stats { margin-top: 14px; color: var(--dim); font-size: 12.5px; text-align: center; line-height: 1.8; }
+.title-stats b { color: var(--moon); font-weight: 700; }
+
+/* 効果音トグル */
+.sound-toggle {
+  position: fixed; top: 10px; right: 12px; z-index: 30;
+  font-size: 18px; line-height: 1; padding: 8px 10px; cursor: pointer;
+  background: rgba(24, 22, 42, .7); border: 1px solid var(--border); border-radius: 50%;
+}
+.sound-toggle.off { filter: grayscale(1) opacity(.55); }
+
+/* 得点フロート */
+.float-text {
+  position: fixed; z-index: 25; pointer-events: none;
+  font-weight: 900; font-size: 22px; color: var(--gold);
+  text-shadow: 0 0 10px rgba(232, 201, 62, .8);
+  animation: floatUp 1.3s ease-out forwards;
+}
+.float-text.bad { color: #e07a7a; text-shadow: 0 0 10px rgba(224, 122, 122, .8); }
+.float-text.big { font-size: 34px; }
+@keyframes floatUp {
+  0% { transform: translateY(0) scale(.7); opacity: 0; }
+  15% { transform: translateY(-8px) scale(1.15); opacity: 1; }
+  100% { transform: translateY(-64px) scale(1); opacity: 0; }
+}
+
+/* 全画面フラッシュ（月蝕・満月・新月・大勝負） */
+.fx-overlay { position: fixed; inset: 0; pointer-events: none; z-index: 15; opacity: 0; }
+.fx-overlay.fx-eclipse { background: radial-gradient(circle, transparent 20%, #2a0518 90%); animation: fxFade 1.6s ease-out; }
+.fx-overlay.fx-full { background: radial-gradient(circle at 50% 20%, rgba(245,230,168,.28), transparent 65%); animation: fxFade 1.4s ease-out; }
+.fx-overlay.fx-new { background: radial-gradient(circle, transparent 30%, rgba(60,20,90,.5) 95%); animation: fxFade 1.4s ease-out; }
+.fx-overlay.fx-bigwin { background: radial-gradient(circle, rgba(232,201,62,.22), transparent 70%); animation: fxFade 1s ease-out; }
+@keyframes fxFade { 0% { opacity: 0; } 25% { opacity: 1; } 100% { opacity: 0; } }
+
+/* 画面シェイク（大ポット決着） */
+.game-layout.shake { animation: shake .5s ease-in-out; }
+@keyframes shake {
+  0%,100% { transform: translate(0,0); }
+  20% { transform: translate(-7px,3px); } 40% { transform: translate(6px,-4px); }
+  60% { transform: translate(-5px,2px); } 80% { transform: translate(4px,-2px); }
+}
+
+/* 絵文字リアクション */
+.emote-bar { display: inline-flex; gap: 2px; margin-left: 12px; }
+.emote-bar button {
+  font-size: 17px; line-height: 1; padding: 3px 6px; cursor: pointer;
+  background: rgba(24, 22, 42, .7); border: 1px solid #39335c; border-radius: 8px;
+  transition: transform .1s;
+}
+.emote-bar button:hover { transform: scale(1.2); border-color: var(--gold); }
+.emote-bubble {
+  display: inline-block; font-size: 26px; margin-left: 10px;
+  animation: emotePop 2.2s ease-out forwards;
+}
+@keyframes emotePop {
+  0% { transform: scale(0); opacity: 0; }
+  12% { transform: scale(1.4); opacity: 1; }
+  24% { transform: scale(1); }
+  80% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(.8); opacity: 0; }
+}
+
 /* 狭い画面 */
 @media (max-width: 720px) {
   .card { width: 92px; height: 134px; }

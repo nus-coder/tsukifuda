@@ -121,6 +121,37 @@ const UI = (() => {
   function setHint(text) { $('turn-hint').textContent = text; }
   function setConfirmVisible(v) { $('btn-confirm').classList.toggle('hidden', !v); }
 
+  // ---------- 演出ヘルパー ----------
+  function floatText(anchorEl, text, cls = '') {
+    const r = anchorEl.getBoundingClientRect();
+    const el = document.createElement('div');
+    el.className = `float-text ${cls}`;
+    el.textContent = text;
+    el.style.left = (r.left + r.width / 2 - 20) + 'px';
+    el.style.top = (r.top - 8) + 'px';
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 1400);
+  }
+
+  function flashFx(kind) {
+    const el = $('fx-overlay');
+    el.className = 'fx-overlay'; void el.offsetWidth;
+    el.classList.add(`fx-${kind}`);
+  }
+
+  function shake() {
+    const el = document.querySelector('.game-layout');
+    el.classList.remove('shake'); void el.offsetWidth;
+    el.classList.add('shake');
+  }
+
+  // ラウンド開始時の月齢演出
+  function phaseAmbience(phase) {
+    if (phase.moon === 'eclipse') { flashFx('eclipse'); SOUND.play('eclipse'); }
+    else if (phase.moon === 'full') flashFx('full');
+    else if (phase.moon === 'new') flashFx('new');
+  }
+
   // ---------- ラウンド公開演出 ----------
   // result: ENGINE.resolveRound の result。myIndex 視点で表示。
   function revealRound(result, myIndex, done) {
@@ -132,12 +163,33 @@ const UI = (() => {
     const myCard = makeCardEl(myPick);
     const oppCard = makeCardEl(oppPick);
     mySlot.appendChild(myCard); oppSlot.appendChild(oppCard);
+    SOUND.play('flip');
 
     setTimeout(() => {
-      if (result.winner !== -1) {
+      // 効果音と演出
+      if (result.phase.moon === 'full' && result.picks.includes(8) && !result.eclipse) SOUND.play('howl');
+      if (result.winner === -1) {
+        SOUND.play(result.events.includes('fox_draw') ? 'fox' : 'draw');
+        floatText($('pot-label').textContent ? $('pot-label') : $('stake-label'), `持ち越し +${result.pot}`, 'bad');
+      } else {
         const iWon = result.winner === myIndex;
         (iWon ? myCard : oppCard).classList.add('win');
         (iWon ? oppCard : myCard).classList.add('lose');
+        SOUND.play(iWon ? 'win' : 'lose');
+        if (result.events.includes('lantern')) {
+          SOUND.play('lantern');
+          floatText(iWon ? $('my-score') : $('opp-score'), '灯が消えた…', 'bad');
+        } else {
+          floatText(iWon ? $('my-score') : $('opp-score'), `+${result.stake}`, result.stake >= 5 ? 'big' : '');
+          if (result.stake >= 5) { flashFx('bigwin'); shake(); SOUND.play('pot'); }
+        }
+        if (result.events.includes('tengu') || result.events.includes('kappa')) setTimeout(() => SOUND.play('coin'), 350);
+        if (result.events.includes('orochi')) {
+          setTimeout(() => {
+            SOUND.play('steal');
+            floatText(iWon ? $('opp-score') : $('my-score'), '-1', 'bad');
+          }, 500);
+        }
       }
       log(describeRound(result, myIndex));
       setTimeout(done, 1900);
@@ -191,6 +243,45 @@ const UI = (() => {
     el.addEventListener('mouseleave', () => tip.classList.add('hidden'));
   }
 
+  // ---------- 絵文字リアクション ----------
+  const EMOTES = ['😼', '🔥', '😱', '🙏', '😆', '🌕'];
+  let emoteTimers = { me: null, opp: null };
+
+  function renderEmoteBar(onSend) {
+    const bar = $('emote-bar');
+    bar.innerHTML = '';
+    EMOTES.forEach((e, i) => {
+      const b = document.createElement('button');
+      b.textContent = e;
+      b.addEventListener('click', () => onSend(i));
+      bar.appendChild(b);
+    });
+  }
+  function setEmoteBarVisible(v) { $('emote-bar').classList.toggle('hidden', !v); }
+
+  function showEmote(side, index) {
+    if (!(index >= 0 && index < EMOTES.length)) return;
+    const el = $(side === 'me' ? 'emote-me' : 'emote-opp');
+    el.textContent = EMOTES[index];
+    el.classList.remove('hidden');
+    void el.offsetWidth; // アニメ再始動
+    clearTimeout(emoteTimers[side]);
+    emoteTimers[side] = setTimeout(() => el.classList.add('hidden'), 2200);
+    SOUND.play('emote');
+  }
+
+  // ---------- タイトル戦績 ----------
+  function renderTitleStats(stats) {
+    const label = { novice: 'CPU 見習い妖怪', hard: 'CPU 大妖怪', online: 'オンライン' };
+    const lines = Object.entries(label)
+      .filter(([k]) => stats[k] && (stats[k].w + stats[k].l + stats[k].d) > 0)
+      .map(([k, name]) => {
+        const s = stats[k];
+        return `${name}：<b>${s.w}勝</b> ${s.l}敗${s.d ? ` ${s.d}分` : ''}`;
+      });
+    $('title-stats').innerHTML = lines.length ? `⚔ これまでの戦績<br>${lines.join('　')}` : '';
+  }
+
   // ---------- 結果 ----------
   function showResult(winner, myIndex, state, names) {
     const t = $('result-title'), d = $('result-detail');
@@ -229,5 +320,6 @@ const UI = (() => {
   return {
     showScreen, renderGame, markSelected, setHint, setConfirmVisible,
     revealRound, log, clearLog, showResult, hideResult, renderRules, $,
+    phaseAmbience, renderEmoteBar, setEmoteBarVisible, showEmote, renderTitleStats,
   };
 })();

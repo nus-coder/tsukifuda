@@ -21,6 +21,9 @@
     <button class="btn btn-sub" data-action="rules">遊び方</button>
   </nav>
   <p class="credit">同じ12枚の手札で読み合う、月光点の争奪戦。</p>
+  <div id="title-stats" class="title-stats"></div>
+  <div class="shooting-star" style="--delay:2s; --top:12%"></div>
+  <div class="shooting-star" style="--delay:9s; --top:30%"></div>
 </section>
 
 <!-- ルール画面 -->
@@ -58,7 +61,9 @@
 <section id="screen-game" class="screen">
   <div class="game-layout">
     <div class="opp-area">
-      <div class="player-label"><span id="opp-name">相手</span> <span class="score-badge" id="opp-score">0</span></div>
+      <div class="player-label"><span id="opp-name">相手</span> <span class="score-badge" id="opp-score">0</span>
+        <span class="emote-bubble hidden" id="emote-opp"></span>
+      </div>
       <div class="opp-hand" id="opp-hand"></div>
     </div>
 
@@ -77,7 +82,10 @@
     </div>
 
     <div class="my-area">
-      <div class="player-label"><span id="my-name">あなた</span> <span class="score-badge" id="my-score">0</span> <span id="my-buff" class="buff-badge hidden">次+2</span></div>
+      <div class="player-label"><span id="my-name">あなた</span> <span class="score-badge" id="my-score">0</span> <span id="my-buff" class="buff-badge hidden">次+2</span>
+        <span class="emote-bubble hidden" id="emote-me"></span>
+        <span class="emote-bar hidden" id="emote-bar"></span>
+      </div>
       <div class="my-hand" id="my-hand"></div>
       <div class="action-bar">
         <button class="btn btn-confirm hidden" id="btn-confirm">このカードで勝負！</button>
@@ -87,6 +95,9 @@
   </div>
   <div class="card-tooltip hidden" id="card-tooltip"></div>
 </section>
+
+<div id="fx-overlay" class="fx-overlay"></div>
+<button id="btn-sound" class="sound-toggle" title="効果音の切り替え">🔊</button>
 
 <!-- 結果オーバーレイ -->
 <div id="result-overlay" class="overlay hidden">
@@ -104,6 +115,7 @@
         integrity="sha384-nlUQ8ZqCbvStErob+biJNzSgltf6urV3VGqhfIfzhmg9RXmpeRm76ELw0pYnKlTR"
         crossorigin="anonymous"></script>
 <script src="js/cards.js"></script>
+<script src="js/sound.js"></script>
 <script src="js/engine.js"></script>
 <script src="js/ai.js"></script>
 <script src="js/ui.js"></script>

@@ -19,6 +19,21 @@
     theirRematch: false,
   };
 
+  // ---------- 戦績 (localStorage) ----------
+  const STATS_KEY = 'tsukifuda-stats';
+  function loadStats() {
+    try { return JSON.parse(localStorage.getItem(STATS_KEY)) || {}; } catch (_) { return {}; }
+  }
+  function recordResult(winner) {
+    const mode = G.mode === 'cpu' ? G.level : 'online';
+    const stats = loadStats();
+    const s = stats[mode] ?? (stats[mode] = { w: 0, l: 0, d: 0 });
+    if (winner === -1) s.d++;
+    else if (winner === G.myIndex) s.w++;
+    else s.l++;
+    localStorage.setItem(STATS_KEY, JSON.stringify(stats));
+  }
+
   // ---------- 共通ヘルパ ----------
   function view() { return { state: G.state, myIndex: G.myIndex, names: G.names, taken: G.taken }; }
 
@@ -32,8 +47,10 @@
         G.selected = id;
         UI.markSelected(el);
         UI.setConfirmVisible(true);
+        SOUND.play('select');
       },
     });
+    UI.phaseAmbience(G.state.phases[G.state.round]);
   }
 
   function finishRound(result) {
@@ -41,6 +58,7 @@
     UI.revealRound(result, G.myIndex, () => {
       if (G.state.finished) {
         const w = ENGINE.gameWinner(G.state);
+        recordResult(w);
         UI.renderGame(view(), { locked: true });
         UI.showResult(w, G.myIndex, G.state, G.names);
       } else {
@@ -57,7 +75,9 @@
     G.taken = [];
     UI.clearLog();
     UI.hideResult();
+    UI.setEmoteBarVisible(false);
     UI.showScreen('game');
+    SOUND.play('start');
     startRound();
   }
 
@@ -113,7 +133,9 @@
     G.myRematch = false; G.theirRematch = false;
     UI.clearLog();
     UI.hideResult();
+    UI.setEmoteBarVisible(true);
     UI.showScreen('game');
+    SOUND.play('start');
     startRound();
   }
 
@@ -164,6 +186,9 @@
         maybeResolve();
         break;
       }
+      case 'emote':
+        UI.showEmote('opp', Number(msg.e));
+        break;
       case 'rematch':
         G.theirRematch = true;
         tryRematchOnline();
@@ -232,6 +257,7 @@
         if (G.mode === 'online') { ONLINE.close(); G.mode = null; }
         UI.hideResult();
         UI.$('btn-host').disabled = false;
+        UI.renderTitleStats(loadStats());
         UI.showScreen('title');
         break;
     }
@@ -241,6 +267,28 @@
     if (G.mode === 'cpu') confirmCpu();
     else if (G.mode === 'online') confirmOnline().catch(console.error);
   });
+
+  // 効果音トグル
+  const soundBtn = UI.$('btn-sound');
+  const syncSoundBtn = () => {
+    soundBtn.textContent = SOUND.muted ? '🔇' : '🔊';
+    soundBtn.classList.toggle('off', SOUND.muted);
+  };
+  soundBtn.addEventListener('click', () => { SOUND.toggleMute(); syncSoundBtn(); SOUND.play('click'); });
+  syncSoundBtn();
+
+  // 絵文字リアクション（オンライン戦のみ表示、連打は1.5秒に1回まで）
+  let lastEmoteAt = 0;
+  UI.renderEmoteBar(i => {
+    const now = Date.now();
+    if (G.mode !== 'online' || now - lastEmoteAt < 1500) return;
+    lastEmoteAt = now;
+    ONLINE.send({ t: 'emote', e: i });
+    UI.showEmote('me', i);
+  });
+
+  // 初期表示
+  UI.renderTitleStats(loadStats());
 
   UI.$('btn-rematch').addEventListener('click', () => {
     if (G.mode === 'cpu') startCpuGame(G.level);
