@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ツキフダ 〜月夜の十二番勝負〜</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='40' fill='%23f5e6a8'/></svg>">
+</head>
+<body>
+
+<!-- タイトル画面 -->
+<section id="screen-title" class="screen active">
+  <div class="title-moon"></div>
+  <h1 class="game-title"><span>ツキフダ</span></h1>
+  <p class="subtitle">〜 月夜の十二番勝負 〜</p>
+  <nav class="menu">
+    <button class="btn" data-action="cpu-novice">ひとりで遊ぶ（CPU: 見習い妖怪）</button>
+    <button class="btn" data-action="cpu-hard">ひとりで遊ぶ（CPU: 大妖怪）</button>
+    <button class="btn" data-action="online">ふたりで遊ぶ（オンライン対戦）</button>
+    <button class="btn btn-sub" data-action="rules">遊び方</button>
+  </nav>
+  <p class="credit">同じ12枚の手札で読み合う、月光点の争奪戦。</p>
+</section>
+
+<!-- ルール画面 -->
+<section id="screen-rules" class="screen">
+  <div class="rules-panel">
+    <h2>遊び方</h2>
+    <div id="rules-body"></div>
+    <button class="btn" data-action="back-title">タイトルへ戻る</button>
+  </div>
+</section>
+
+<!-- オンラインロビー -->
+<section id="screen-lobby" class="screen">
+  <div class="lobby-panel">
+    <h2>オンライン対戦</h2>
+    <div class="lobby-row">
+      <button class="btn" id="btn-host">部屋を作る</button>
+      <div id="host-info" class="hidden">
+        <p>合言葉を相手に伝えてください：</p>
+        <p class="room-code" id="room-code"></p>
+        <p class="waiting">相手の参加を待っています…</p>
+      </div>
+    </div>
+    <div class="lobby-divider">または</div>
+    <div class="lobby-row">
+      <input type="text" id="join-code" maxlength="5" placeholder="合言葉（5文字）" autocomplete="off">
+      <button class="btn" id="btn-join">部屋に入る</button>
+    </div>
+    <p id="lobby-status" class="lobby-status"></p>
+    <button class="btn btn-sub" data-action="back-title">タイトルへ戻る</button>
+  </div>
+</section>
+
+<!-- ゲーム画面 -->
+<section id="screen-game" class="screen">
+  <div class="game-layout">
+    <div class="opp-area">
+      <div class="player-label"><span id="opp-name">相手</span> <span class="score-badge" id="opp-score">0</span></div>
+      <div class="opp-hand" id="opp-hand"></div>
+    </div>
+
+    <div class="table-area">
+      <div class="phase-track" id="phase-track"></div>
+      <div class="battle-zone">
+        <div class="played-slot" id="slot-opp"></div>
+        <div class="center-info">
+          <div class="round-label" id="round-label"></div>
+          <div class="stake-label" id="stake-label"></div>
+          <div class="pot-label" id="pot-label"></div>
+        </div>
+        <div class="played-slot" id="slot-me"></div>
+      </div>
+      <div class="log" id="log"></div>
+    </div>
+
+    <div class="my-area">
+      <div class="player-label"><span id="my-name">あなた</span> <span class="score-badge" id="my-score">0</span> <span id="my-buff" class="buff-badge hidden">次+2</span></div>
+      <div class="my-hand" id="my-hand"></div>
+      <div class="action-bar">
+        <button class="btn btn-confirm hidden" id="btn-confirm">このカードで勝負！</button>
+        <span id="turn-hint" class="turn-hint"></span>
+      </div>
+    </div>
+  </div>
+  <div class="card-tooltip hidden" id="card-tooltip"></div>
+</section>
+
+<!-- 結果オーバーレイ -->
+<div id="result-overlay" class="overlay hidden">
+  <div class="result-panel">
+    <h2 id="result-title"></h2>
+    <p id="result-detail"></p>
+    <div class="result-buttons">
+      <button class="btn" id="btn-rematch">もう一回</button>
+      <button class="btn btn-sub" data-action="back-title">タイトルへ</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"
+        integrity="sha384-nlUQ8ZqCbvStErob+biJNzSgltf6urV3VGqhfIfzhmg9RXmpeRm76ELw0pYnKlTR"
+        crossorigin="anonymous"></script>
+<script src="js/cards.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/ai.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/online.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,149 @@
+// engine.test.js — node test/engine.test.js で実行する簡易テスト
+'use strict';
+const ENGINE = require('../js/engine.js');
+const AI_PATH = '../js/ai.js';
+
+let pass = 0, fail = 0;
+function eq(label, actual, expected) {
+  const ok = JSON.stringify(actual) === JSON.stringify(expected);
+  if (ok) { pass++; }
+  else { fail++; console.error(`✗ ${label}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`); }
+}
+
+// 月齢を固定してテスト用状態を作る
+function game(moon = 'crescent', value = 1) {
+  const phases = Array(12).fill(null).map(() => ({ moon: 'crescent', value: 1 }));
+  phases[0] = { moon, value };
+  return ENGINE.newGame(phases);
+}
+
+// 基本: 高い方が勝ち、月光点獲得
+{
+  const { state, result } = ENGINE.resolveRound(game('half', 2), [10, 3]);
+  eq('高パワー勝利', result.winner, 0);
+  eq('得点', state.players[0].score, 2);
+  eq('河童の負け+1', state.players[1].score, 1);
+  eq('手札から消える', state.players[0].hand.includes(10), false);
+}
+// 新月: 低い方が勝つ
+{
+  const { result } = ENGINE.resolveRound(game('new', 3), [11, 4]);
+  eq('新月は低い方', result.winner, 1);
+}
+// ねずみ小僧: 10以上に勝つ / 9には負ける
+{
+  eq('ねずみvs月読', ENGINE.resolveRound(game(), [0, 11]).result.winner, 0);
+  eq('ねずみvs大蛇', ENGINE.resolveRound(game(), [0, 9]).result.winner, 1);
+}
+// 満月の人狼: 8+5=13 → 11に勝つ / ねずみには負ける
+{
+  eq('満月人狼vs月読', ENGINE.resolveRound(game('full', 3), [8, 11]).result.winner, 0);
+  eq('満月人狼vsねずみ', ENGINE.resolveRound(game('full', 3), [8, 0]).result.winner, 1);
+  eq('平時人狼vs大蛇', ENGINE.resolveRound(game(), [8, 9]).result.winner, 1);
+}
+// 月蝕: 能力無効（ねずみは負け、河童ボーナスなし）
+{
+  const { state, result } = ENGINE.resolveRound(game('eclipse', 4), [0, 11]);
+  eq('月蝕でねずみ無力', result.winner, 1);
+  eq('月蝕で河童系も無効', state.players[0].score, 0);
+}
+// 猫又: 相手能力無効（vs妖狐 → 強制引き分けが消え、5>2で狐側勝ち）
+{
+  const { result } = ENGINE.resolveRound(game(), [2, 5]);
+  eq('猫又が妖狐を無効化', result.winner, 1);
+}
+// 妖狐: 強制引き分け＆ポット持ち越し
+{
+  const { state, result } = ENGINE.resolveRound(game('half', 2), [5, 11]);
+  eq('妖狐引き分け', result.winner, -1);
+  eq('ポット持ち越し', state.pot, 2);
+}
+// ポットの獲得
+{
+  let s = game('half', 2);
+  s.pot = 5;
+  const { state, result } = ENGINE.resolveRound(s, [10, 3]);
+  eq('ポット込み獲得', state.players[0].score, 7);
+  eq('ポットリセット', state.pot, 0);
+}
+// 巫女: 同点勝ち（バフ済み巫女7+2=9 vs 大蛇9）
+{
+  let s = game();
+  s.players[0].buff = 2;
+  const { result } = ENGINE.resolveRound(s, [7, 9]);
+  eq('巫女の同点勝ち', result.winner, 0);
+}
+// ミラー対決は引き分け
+{
+  const { result } = ENGINE.resolveRound(game(), [7, 7]);
+  eq('ミラー巫女は引き分け', result.winner, -1);
+  eq('ミラー妖狐は引き分け', ENGINE.resolveRound(game(), [5, 5]).result.winner, -1);
+}
+// 提灯おばけ: 負けても点を渡さない
+{
+  const { state, result } = ENGINE.resolveRound(game('half', 2), [1, 10]);
+  eq('提灯: 勝者の得点0', state.players[1].score, 0);
+  eq('提灯: ポットへ', state.pot, 2);
+  eq('提灯: 勝敗自体は相手', result.winner, 1);
+}
+// 天狗・大蛇・侍
+{
+  const { state } = ENGINE.resolveRound(game(), [4, 3]);
+  eq('天狗+1', state.players[0].score, 2); // 1点+ボーナス1
+  let s2 = game();
+  s2.players[1].score = 3;
+  const r2 = ENGINE.resolveRound(s2, [9, 3]);
+  eq('大蛇の強奪', [r2.state.players[0].score, r2.state.players[1].score], [2, 3]); // 9側: 1+1=2 / 3側: 3-1+1=3
+  const r3 = ENGINE.resolveRound(game(), [6, 3]);
+  eq('侍バフ予約', r3.state.players[0].buff, 2);
+  const r4 = ENGINE.resolveRound(r3.state, [5 /*本来5*/, 8]);
+  // 5+2=7 vs 8 → 8勝ち…だが5は妖狐! 強制引き分け
+  eq('妖狐は常時発動', r4.result.winner, -1);
+  const r5 = ENGINE.resolveRound(r3.state, [7, 8]);
+  eq('バフ込みパワー', r5.result.power[0], 9);
+}
+// 12ラウンド完走 & 合計チェック
+{
+  let s = ENGINE.newGame(ENGINE.shufflePhases());
+  const total = s.phases.reduce((a, p) => a + p.value, 0);
+  eq('月光点合計25', total, 25);
+  while (!s.finished) {
+    const p0 = s.players[0].hand[Math.floor(Math.random() * s.players[0].hand.length)];
+    const p1 = s.players[1].hand[Math.floor(Math.random() * s.players[1].hand.length)];
+    s = ENGINE.resolveRound(s, [p0, p1]).state;
+  }
+  eq('12R後に終了', s.finished, true);
+  eq('手札空', [s.players[0].hand.length, s.players[1].hand.length], [0, 0]);
+  const w = ENGINE.gameWinner(s);
+  eq('勝者判定が返る', [-1, 0, 1].includes(w), true);
+}
+
+// AIスモークテスト（ブラウザグローバル ENGINE を注入して読み込む）
+{
+  global.ENGINE = ENGINE;
+  const AI = require(AI_PATH);
+  let s = ENGINE.newGame(ENGINE.shufflePhases());
+  for (const level of ['novice', 'hard']) {
+    const c = AI.pick(s, level);
+    eq(`AI(${level})が手札から選ぶ`, s.players[1].hand.includes(c), true);
+  }
+  // ハードAI vs 初心者AI を10ゲーム対戦させ、ハードが勝ち越すことを確認
+  let hardWins = 0, games = 30;
+  for (let g = 0; g < games; g++) {
+    let st = ENGINE.newGame(ENGINE.shufflePhases());
+    while (!st.finished) {
+      // player0=novice, player1=hard。noviceは視点反転が必要なので手動で
+      const flip = { ...st, players: [st.players[1], st.players[0]] };
+      const p0 = AI.pick(flip, 'novice');
+      const p1 = AI.pick(st, 'hard');
+      st = ENGINE.resolveRound(st, [p0, p1]).state;
+    }
+    const w = ENGINE.gameWinner(st);
+    if (w === 1) hardWins++;
+  }
+  console.log(`  (参考) ハードAI vs 初心者AI: ${hardWins}/${games} 勝`);
+  eq('ハードAIが勝ち越す', hardWins >= 18, true);
+}
+
+console.log(`\n${pass} passed, ${fail} failed`);
+process.exit(fail ? 1 : 0);
