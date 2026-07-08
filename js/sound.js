@@ -81,86 +81,190 @@ const SOUND = (() => {
     return muted;
   }
 
-  // ===== BGM（生成音楽・音源ファイル不要） =====
-  // 陰旋法（A, B♭, D, E, F）の琴風プラック＋低音ドローン＋エコー。
-  // ランダム生成なので同じフレーズは二度と鳴らない。
+  // ===== BGM（生成オーケストラ風・音源ファイル不要） =====
+  // 「怖いけれど、どこか楽しい月夜の祭り」がテーマ。
+  // Aマイナーの壮大な進行に、ドリアの明るいDと和声的短音階のEを混ぜて
+  // 不穏さとワクワクを同居させる。弦・チェロ・ピチカート・チェレスタ・
+  // フルート・ティンパニの6声をスケジューラで鳴らす。
   let bgmOn = localStorage.getItem('tsukifuda-bgm') !== '0'; // 既定ON（初回操作後に開始）
-  let bgm = null; // { master, drone: [osc], timer }
+  let bgm = null; // { master, timer }
 
-  const SCALE = [220.0, 233.1, 293.7, 329.6, 349.2, 440.0, 466.2, 587.3]; // A3陰旋法+オクターブ
+  const mf = m => 440 * Math.pow(2, (m - 69) / 12); // MIDIノート→周波数
 
-  function pluck(c, dest, freq, when, gain) {
-    const osc = c.createOscillator();
-    osc.type = 'triangle';
-    osc.frequency.value = freq;
+  // 8小節のコード進行（notes: 和音構成音, bass: チェロの根音）
+  const PROG = [
+    { notes: [57, 60, 64], bass: 45 },      // Am  — 夜の入り
+    { notes: [53, 57, 60], bass: 41 },      // F   — 広がる
+    { notes: [48, 55, 60, 64], bass: 36 },  // C   — 明るさが差す
+    { notes: [55, 59, 62], bass: 43 },      // G   — 高揚
+    { notes: [57, 60, 64], bass: 45 },      // Am
+    { notes: [60, 64, 67], bass: 48 },      // C   — 楽しい寄り道
+    { notes: [50, 54, 57, 62], bass: 38 },  // D(ドリア) — 妖しい笑み
+    { notes: [52, 56, 59], bass: 40 },      // E(ハーモニックマイナー) — 不穏な引き戻し
+  ];
+
+  // --- 楽器 ---
+  // 弦セクション: デチューンした鋸波3本＋ローパス、ゆっくり立ち上がる
+  function vString(c, out, midi, t, dur, gain = 0.026) {
+    for (const det of [-7, 0, 7]) {
+      const o = c.createOscillator();
+      o.type = 'sawtooth';
+      o.frequency.value = mf(midi);
+      o.detune.value = det + (Math.random() * 2 - 1);
+      const f = c.createBiquadFilter();
+      f.type = 'lowpass'; f.frequency.value = 950; f.Q.value = 0.4;
+      const g = c.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(gain, t + 0.45);
+      g.gain.setValueAtTime(gain, t + dur - 0.35);
+      g.gain.linearRampToValueAtTime(0, t + dur);
+      o.connect(f); f.connect(g); g.connect(out);
+      o.start(t); o.stop(t + dur + 0.1);
+    }
+  }
+  // ピチカート弦: 短い三角波（跳ねるリズムの主役）
+  function vPizz(c, out, midi, t, gain = 0.085) {
+    const o = c.createOscillator();
+    o.type = 'triangle'; o.frequency.value = mf(midi);
     const f = c.createBiquadFilter();
     f.type = 'lowpass';
-    f.frequency.setValueAtTime(freq * 6, when);
-    f.frequency.exponentialRampToValueAtTime(freq * 1.5, when + 1.2);
+    f.frequency.setValueAtTime(mf(midi) * 4, t);
+    f.frequency.exponentialRampToValueAtTime(mf(midi) * 1.2, t + 0.16);
     const g = c.createGain();
-    g.gain.setValueAtTime(0, when);
-    g.gain.linearRampToValueAtTime(gain, when + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, when + 1.6);
-    osc.connect(f); f.connect(g); g.connect(dest);
-    osc.start(when); osc.stop(when + 1.8);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(gain, t + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+    o.connect(f); f.connect(g); g.connect(out);
+    o.start(t); o.stop(t + 0.28);
+  }
+  // チェレスタ: 倍音つきの鐘（オルゴールの煌めき）
+  function vBell(c, out, midi, t, gain = 0.06) {
+    for (const [ratio, amp] of [[1, 1], [2.76, 0.32], [5.4, 0.1]]) {
+      const o = c.createOscillator();
+      o.type = 'sine'; o.frequency.value = mf(midi) * ratio;
+      const g = c.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(gain * amp, t + 0.006);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 1.1);
+      o.connect(g); g.connect(out);
+      o.start(t); o.stop(t + 1.2);
+    }
+  }
+  // フルート: ビブラートつき三角波の対旋律
+  function vFlute(c, out, midi, t, dur, gain = 0.045) {
+    const o = c.createOscillator();
+    o.type = 'triangle'; o.frequency.value = mf(midi);
+    const lfo = c.createOscillator(); lfo.frequency.value = 5.5;
+    const lg = c.createGain(); lg.gain.value = 5;
+    lfo.connect(lg); lg.connect(o.frequency);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(gain, t + 0.09);
+    g.gain.setValueAtTime(gain, t + dur - 0.12);
+    g.gain.linearRampToValueAtTime(0, t + dur);
+    o.connect(g); g.connect(out);
+    o.start(t); o.stop(t + dur + 0.05);
+    lfo.start(t); lfo.stop(t + dur);
+  }
+  // ティンパニ: 音程が沈む正弦波
+  function vTimp(c, out, t, gain = 0.15) {
+    const o = c.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(82, t);
+    o.frequency.exponentialRampToValueAtTime(46, t + 0.25);
+    const g = c.createGain();
+    g.gain.setValueAtTime(gain, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+    o.connect(g); g.connect(out);
+    o.start(t); o.stop(t + 0.55);
   }
 
   function startBgm() {
     if (bgm || !bgmOn) return;
     const c = ac();
+    // コンプレッサーで全体をまとめ、うるさくならないように
+    const comp = c.createDynamicsCompressor();
+    comp.threshold.value = -20; comp.ratio.value = 3.5;
+    comp.connect(c.destination);
     const master = c.createGain();
     master.gain.value = 0;
-    master.gain.linearRampToValueAtTime(0.5, c.currentTime + 2.5); // フェードイン
-    master.connect(c.destination);
-
-    // エコー（琴の残響）
+    master.gain.linearRampToValueAtTime(0.55, c.currentTime + 2.0); // フェードイン
+    master.connect(comp);
+    // 付点8分のエコー（チェレスタとフルート用のセンド）
     const delay = c.createDelay(1.0);
-    delay.delayTime.value = 0.42;
-    const fb = c.createGain(); fb.gain.value = 0.32;
-    const wet = c.createGain(); wet.gain.value = 0.35;
+    delay.delayTime.value = 0.31;
+    const fb = c.createGain(); fb.gain.value = 0.24;
+    const wet = c.createGain(); wet.gain.value = 0.5;
     delay.connect(fb); fb.connect(delay); delay.connect(wet); wet.connect(master);
+    const echoSend = c.createGain();
+    echoSend.connect(master); echoSend.connect(delay);
 
-    // 低音ドローン（夜の底）
-    const drone = [55, 110.3].map(fr => {
-      const o = c.createOscillator();
-      o.type = 'sine'; o.frequency.value = fr;
-      const g = c.createGain(); g.gain.value = fr < 100 ? 0.05 : 0.025;
-      o.connect(g); g.connect(master);
-      o.start();
-      return o;
-    });
+    const BEAT = 60 / 96, STEP = BEAT / 2, BAR = BEAT * 4; // テンポ96・4拍子
+    let next = c.currentTime + 0.15, step = 0, bar = -1;
+    let chord = PROG[0];
 
-    // フレーズ生成: 1〜3音の小節をランダムな間で置いていく
-    let stopped = false;
-    const inst = { master, drone, stop: () => { stopped = true; } };
-    (function phrase() {
-      if (stopped) return;
-      const t0 = c.currentTime + 0.05;
-      const notes = 1 + Math.floor(Math.random() * 3);
-      let base = Math.floor(Math.random() * SCALE.length);
-      for (let i = 0; i < notes; i++) {
-        const idx = Math.min(SCALE.length - 1, Math.max(0, base + Math.floor(Math.random() * 5) - 2));
-        const out = c.createGain(); out.gain.value = 1;
-        out.connect(master); out.connect(delay);
-        pluck(c, out, SCALE[idx], t0 + i * (0.35 + Math.random() * 0.3), 0.10 + Math.random() * 0.05);
-        base = idx;
+    const timer = setInterval(() => {
+      // 0.4秒先まで先読みスケジュール
+      while (next < c.currentTime + 0.4) {
+        const inBar = step % 8; // 8分音符単位
+        const calm = (bar % 16) >= 12; // 16小節ごとに4小節の静かなブレイク
+
+        if (inBar === 0) {
+          bar++;
+          chord = PROG[bar % PROG.length];
+          const nowCalm = (bar % 16) >= 12;
+          // 弦の和音＋チェロ（ブレイク中は弦を薄く）
+          chord.notes.forEach(n => vString(c, master, n, next, BAR, nowCalm ? 0.015 : 0.026));
+          vString(c, master, chord.bass, next, BAR, 0.03);
+          if (!nowCalm) {
+            vTimp(c, master, next);
+            if ((bar % 4) === 3) vTimp(c, master, next + BEAT * 3, 0.1); // 4小節目はおかず
+          }
+          // フルートの対旋律（2音のため息、たまに上へ跳ねて楽しげに）
+          if ((bar % 2) === 1 && Math.random() < 0.75) {
+            const pool = chord.notes;
+            const m = pool[1 + Math.floor(Math.random() * (pool.length - 1))] + 12;
+            vFlute(c, echoSend, m, next + BEAT * 1.5, BEAT * 0.9);
+            vFlute(c, echoSend, m + (Math.random() < 0.4 ? 5 : 2), next + BEAT * 2.5, BEAT * 1.1);
+          }
+        }
+
+        // ピチカート: 跳ねる8分音符（根音→5度→オクターブ→3度の行き来）
+        if (!calm) {
+          const seq = [
+            chord.bass + 12, chord.notes[1], chord.notes[0] + 12, chord.notes[1],
+            chord.bass + 12, chord.notes[chord.notes.length - 1], chord.notes[0] + 12, chord.notes[1],
+          ];
+          const swing = (inBar % 2) ? STEP * 0.1 : 0; // 裏拍を少し遅らせてスキップ感
+          const accent = (inBar === 0 || inBar === 4) ? 0.095 : 0.065;
+          vPizz(c, master, seq[inBar], next + swing, accent);
+        }
+        // チェレスタ: 裏拍にきらめき（ブレイク中はよく歌う）
+        const bellChance = calm ? 0.45 : 0.28;
+        if ((inBar % 2) === 1 && Math.random() < bellChance) {
+          const pool = chord.notes;
+          const m = pool[Math.floor(Math.random() * pool.length)] + 24 + (Math.random() < 0.15 ? 2 : 0);
+          vBell(c, echoSend, m, next + STEP * 0.1);
+        }
+
+        next += STEP;
+        step++;
       }
-      inst.timer = setTimeout(phrase, 2200 + Math.random() * 2800);
-    })();
-    bgm = inst;
+    }, 60);
+
+    bgm = { master, comp, timer };
   }
 
   function stopBgm() {
     if (!bgm) return;
     try {
-      bgm.stop();
-      clearTimeout(bgm.timer);
+      clearInterval(bgm.timer);
       const c = ac();
       bgm.master.gain.cancelScheduledValues(c.currentTime);
       bgm.master.gain.setValueAtTime(bgm.master.gain.value, c.currentTime);
-      bgm.master.gain.linearRampToValueAtTime(0, c.currentTime + 0.8);
-      const m = bgm.master, d = bgm.drone;
-      setTimeout(() => { d.forEach(o => { try { o.stop(); } catch (_) {} }); m.disconnect(); }, 900);
+      bgm.master.gain.linearRampToValueAtTime(0, c.currentTime + 0.9);
+      const m = bgm.master, cp = bgm.comp;
+      setTimeout(() => { m.disconnect(); cp.disconnect(); }, 1100);
     } catch (_) {}
     bgm = null;
   }
