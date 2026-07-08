@@ -118,6 +118,25 @@ function game(moon = 'crescent', value = 1) {
   eq('勝者判定が返る', [-1, 0, 1].includes(w), true);
 }
 
+// ストーリーモード用: 初期ポットとカスタム月齢プール
+{
+  const s = ENGINE.newGame(Array(12).fill(null).map(() => ({ moon: 'half', value: 2 })), 3);
+  eq('初期ポット', s.pot, 3);
+  const { state } = ENGINE.resolveRound(s, [10, 3]);
+  eq('初期ポット込み獲得', state.players[0].score, 5);
+  const pool = [
+    ...Array(4).fill({ moon: 'crescent', value: 1 }),
+    ...Array(2).fill({ moon: 'half', value: 2 }),
+    ...Array(4).fill({ moon: 'full', value: 3 }),
+    { moon: 'new', value: 3 },
+    { moon: 'eclipse', value: 4 },
+  ];
+  const s2 = ENGINE.newGame(ENGINE.shufflePhases(pool));
+  eq('カスタムプール枚数', s2.phases.length, 12);
+  eq('カスタムプール満月4枚', s2.phases.filter(p => p.moon === 'full').length, 4);
+  eq('カスタムプール合計', s2.phases.reduce((a, p) => a + p.value, 0), 27);
+}
+
 // AIスモークテスト（ブラウザグローバル ENGINE を注入して読み込む）
 {
   global.ENGINE = ENGINE;

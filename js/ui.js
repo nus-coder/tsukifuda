@@ -41,6 +41,7 @@ const UI = (() => {
   // ---------- ゲーム画面描画 ----------
   // view = { state, myIndex, names: [my, opp] }
   function renderGame(view, opts = {}) {
+    $('card-tooltip').classList.add('hidden'); // 再描画でホバー元が消えると残留するため
     const { state, myIndex } = view;
     const me = state.players[myIndex];
     const opp = state.players[1 - myIndex];
@@ -166,6 +167,39 @@ const UI = (() => {
     SOUND.play('flip');
 
     setTimeout(() => {
+      // ---- カード固有演出 ----
+      const bz = document.querySelector('.battle-zone');
+      const cardEl = i => (i === myIndex ? myCard : oppCard);
+      // 妖狐の霧
+      if (result.events.includes('fox_draw')) {
+        const m = document.createElement('div');
+        m.className = 'mist';
+        bz.appendChild(m);
+        setTimeout(() => m.remove(), 2300);
+      }
+      // 人狼の変身（満月）
+      [0, 1].forEach(i => {
+        if (result.picks[i] === 8 && result.phase.moon === 'full' && !result.canceled[i]) {
+          cardEl(i).classList.add('wolf-transform');
+          floatText(cardEl(i), '+5', 'big');
+        }
+      });
+      // ねずみ小僧の下剋上
+      if (result.winner !== -1 && result.picks[result.winner] === 0 && result.power[1 - result.winner] >= 10) {
+        cardEl(result.winner).classList.add('gekokujo');
+        floatText(cardEl(result.winner), '下剋上！', 'big');
+      }
+      // 猫又の「封」スタンプ（能力持ちが無効化されたときだけ）
+      [0, 1].forEach(i => {
+        if (!result.eclipse && result.canceled[i] && result.picks[1 - i] === 2 &&
+            result.picks[i] !== 2 && ![10, 11].includes(result.picks[i])) {
+          const s = document.createElement('div');
+          s.className = 'seal-stamp';
+          s.textContent = '封';
+          cardEl(i).appendChild(s);
+        }
+      });
+
       // 効果音と演出
       if (result.phase.moon === 'full' && result.picks.includes(8) && !result.eclipse) SOUND.play('howl');
       if (result.winner === -1) {
@@ -288,38 +322,131 @@ const UI = (() => {
     if (winner === -1) t.textContent = '引き分け';
     else t.textContent = winner === myIndex ? 'あなたの勝ち！' : 'あなたの負け…';
     d.textContent = `${names[0]} ${state.players[myIndex].score}点 — ${names[1]} ${state.players[1 - myIndex].score}点`;
+    // ストーリー用装飾をリセット（必要なら decorateStoryResult で付け直す）
+    $('result-story-msg').classList.add('hidden');
+    $('btn-story-back').classList.add('hidden');
+    $('btn-rematch').textContent = 'もう一回';
     $('result-overlay').classList.remove('hidden');
   }
   function hideResult() { $('result-overlay').classList.add('hidden'); }
 
-  // ---------- ルール文 ----------
-  function renderRules() {
+  // ---------- 遊び方（ページ式チュートリアル） ----------
+  let rulesPage = 0;
+
+  function rulesPages() {
+    const miniCard = id => `<div class="tut-card"><div class="card">${cardHTML(id)}</div></div>`;
+    const moonItem = (m, v) =>
+      `<div class="tut-moon">${moonIconSVG(m)}<b>${MOONS[m].name}（${v}点）</b>${MOONS[m].desc}</div>`;
     const cardRows = CARDS.map(c => `<tr><td>${c.id}</td><td>${c.name}</td><td>${c.text}</td></tr>`).join('');
-    $('rules-body').innerHTML = `
-      <h3>これはどんなゲーム？</h3>
-      <p>あなたと相手は<strong>まったく同じ12枚の妖怪カード</strong>（パワー0〜11）を持って、12ラウンドの勝負をします。
-      毎ラウンド同時に1枚出し、勝った方がそのラウンドの<strong>月光点</strong>を獲得。合計点が多い方の勝ちです。
-      使ったカードは戻りません。つまり<strong>相手の残り手札は常に丸見え</strong>——読み合いがすべてです。</p>
-      <h3>月齢カード</h3>
-      <p>12ラウンド分の月齢（＝得点）は最初から全部公開されています。三日月=1点、半月=2点、満月=3点（人狼が強化）、
-      <strong>新月=3点（パワーの低い方が勝つ！）</strong>、<strong>月蝕=4点（能力がすべて無効）</strong>。</p>
-      <h3>引き分けとポット</h3>
-      <p>引き分けたラウンドの月光点は<strong>持ち越し</strong>になり、次のラウンドの賭け金に上乗せされます。
-      妖狐や同カード対決（ミラー）で引き分けを重ねると、1ラウンドに大量の点がかかる大勝負が生まれます。</p>
-      <h3>カード一覧</h3>
-      <table><tr><th>パワー</th><th>名前</th><th>能力</th></tr>${cardRows}</table>
-      <h3>細かい処理順</h3>
-      <ul>
-        <li>月蝕 → 猫又 → パワー修正（人狼・侍の霊）→ 妖狐の強制引き分け → 勝敗判定 の順で解決。</li>
-        <li>ねずみ小僧は「修正後」パワー10以上の相手に勝つ（満月の人狼13にも勝てる）。</li>
-        <li>妖狐の引き分けは巫女でも覆せない。同カード対決は必ず引き分け。</li>
-        <li>最終ラウンドで持ち越しが発生した場合、その点は消滅する。</li>
-      </ul>`;
+    return [
+      `<h3>1. 同じ手札で、同時に出す</h3>
+       <p>あなたと相手は<strong>まったく同じ12枚の妖怪カード</strong>（パワー0〜11）を持って、12ラウンド戦います。
+       毎ラウンド<strong>同時に1枚</strong>出して、基本は<strong>パワーの高い方が勝ち</strong>。
+       勝った方がそのラウンドの<strong>月光点</strong>をもらい、合計点で勝敗が決まります。</p>
+       <div class="tut-visual">${miniCard(4)}<span class="vs">VS</span>${miniCard(9)}</div>
+       <p>使ったカードは戻りません。お互い同じデッキだから、<strong>相手の残り手札は常に丸見え</strong>。
+       「相手にはまだ月読(11)が残ってる…どこで切ってくる？」——この読み合いがすべてです。</p>`,
+      `<h3>2. 月齢カード＝そのラウンドの点数</h3>
+       <p>12ラウンド分の月齢は<strong>最初から全部公開</strong>されています。
+       高得点のラウンドがいつ来るかわかるので、強いカードの温存と投入が戦略になります。</p>
+       <div class="tut-visual">
+         ${moonItem('crescent', 1)}${moonItem('half', 2)}${moonItem('full', 3)}${moonItem('new', 3)}${moonItem('eclipse', 4)}
+       </div>
+       <p><strong>新月はパワーの低い方が勝ち</strong>、<strong>月蝕は能力がすべて無効</strong>。
+       強いカードほど危ないラウンドがある——ここで形勢がひっくり返ります。</p>`,
+      `<h3>3. 引き分けは「持ち越し」で膨らむ</h3>
+       <p>引き分けたラウンドの月光点は<strong>ポットに持ち越され</strong>、次のラウンドの賭け金に上乗せされます。
+       妖狐（強制引き分け）や同カード対決（ミラー）が続くと、1ラウンドに8点以上かかる大勝負に！</p>
+       <div class="tut-visual">${miniCard(5)}<span class="vs">＝</span>${miniCard(7)}</div>
+       <h3>能力の処理順（細かいルール）</h3>
+       <ul>
+         <li>月蝕 → 猫又 → パワー修正（人狼・侍の霊）→ 妖狐の強制引き分け → 勝敗判定 の順。</li>
+         <li>ねずみ小僧は「修正後」パワー10以上の相手に勝つ（満月の人狼13にも勝てる）。</li>
+         <li>妖狐の引き分けは巫女でも覆せない。同カード対決は必ず引き分け。</li>
+         <li>最終ラウンドの持ち越しは消滅する。</li>
+       </ul>`,
+      `<h3>4. カード一覧</h3>
+       <table><tr><th>パワー</th><th>名前</th><th>能力</th></tr>${cardRows}</table>`,
+    ];
+  }
+
+  function renderRules(page = 0) {
+    const pages = rulesPages();
+    rulesPage = Math.min(Math.max(page, 0), pages.length - 1);
+    $('rules-body').innerHTML = pages[rulesPage];
+    $('rules-prev').disabled = rulesPage === 0;
+    $('rules-next').disabled = rulesPage === pages.length - 1;
+    $('rules-dots').innerHTML = pages.map((_, i) => `<span class="${i === rulesPage ? 'on' : ''}">●</span>`).join('');
+  }
+  $('rules-prev').addEventListener('click', () => { renderRules(rulesPage - 1); SOUND.play('click'); });
+  $('rules-next').addEventListener('click', () => { renderRules(rulesPage + 1); SOUND.play('click'); });
+
+  function setRulesBackLabel(text) { $('rules-back').textContent = text; }
+
+  // ---------- ストーリー ----------
+  function renderStory(onSelect) {
+    const prog = STORY.progress();
+    const list = $('boss-list');
+    list.innerHTML = '';
+    if (prog >= STORY.BOSSES.length) {
+      const banner = document.createElement('div');
+      banner.className = 'story-clear-banner';
+      banner.textContent = '🌕 全妖怪制覇！今宵より月夜はあなたのもの 🌕';
+      list.appendChild(banner);
+    }
+    STORY.BOSSES.forEach((b, i) => {
+      const locked = i > prog;
+      const el = document.createElement('button');
+      el.className = 'boss-card' + (locked ? ' locked' : '') + (i < prog ? ' cleared' : '');
+      el.innerHTML = `
+        <div class="boss-portrait">${CARD_ART[b.art]}</div>
+        <div class="boss-info">
+          <div class="b-title">${b.title}</div>
+          <div class="b-name">${locked ? '？？？' : b.name}</div>
+          <div class="b-gimmick">${locked ? '前の相手を倒すと挑める。' : b.gimmick}</div>
+        </div>
+        <div class="boss-mark">${i < prog ? '✅' : (locked ? '🔒' : '⚔️')}</div>`;
+      if (!locked) el.addEventListener('click', () => onSelect(i));
+      list.appendChild(el);
+    });
+  }
+
+  // 会話再生。クリックで進み、全行読み終えたら onDone
+  let dialogueState = null;
+  function showDialogue(boss, lines, onDone) {
+    dialogueState = { lines, index: 0, onDone };
+    $('dialogue-portrait').innerHTML = CARD_ART[boss.art];
+    $('dialogue-name').textContent = boss.name;
+    $('dialogue-text').textContent = lines[0];
+    $('dialogue-overlay').classList.remove('hidden');
+  }
+  $('dialogue-overlay').addEventListener('click', () => {
+    if (!dialogueState) return;
+    SOUND.play('click');
+    dialogueState.index += 1;
+    if (dialogueState.index < dialogueState.lines.length) {
+      $('dialogue-text').textContent = dialogueState.lines[dialogueState.index];
+    } else {
+      $('dialogue-overlay').classList.add('hidden');
+      const done = dialogueState.onDone;
+      dialogueState = null;
+      done?.();
+    }
+  });
+
+  // ストーリー用の結果画面装飾（showResult の後に呼ぶ）
+  function decorateStoryResult(message, rematchLabel) {
+    const msgEl = $('result-story-msg');
+    msgEl.textContent = message;
+    msgEl.classList.remove('hidden');
+    $('btn-story-back').classList.remove('hidden');
+    $('btn-rematch').textContent = rematchLabel;
   }
 
   return {
     showScreen, renderGame, markSelected, setHint, setConfirmVisible,
     revealRound, log, clearLog, showResult, hideResult, renderRules, $,
     phaseAmbience, renderEmoteBar, setEmoteBarVisible, showEmote, renderTitleStats,
+    setRulesBackLabel, renderStory, showDialogue, decorateStoryResult,
   };
 })();

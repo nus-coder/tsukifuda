@@ -88,7 +88,9 @@ const AI = (() => {
   }
 
   function pick(state, level) {
-    return level === 'hard' ? pickHard(state) : pickNovice(state);
+    if (level === 'hard') return pickHard(state);
+    if (level === 'mid') return Math.random() < 0.35 ? pickNovice(state) : pickHard(state);
+    return pickNovice(state);
   }
 
   return { pick };

@@ -3,8 +3,10 @@
 
 (() => {
   const G = {
-    mode: null,        // 'cpu' | 'online'
-    level: null,       // 'novice' | 'hard'
+    mode: null,        // 'cpu' | 'online' | 'story'
+    level: null,       // 'novice' | 'mid' | 'hard'
+    bossIndex: 0,      // ストーリーモードの現在ボス
+    rulesReturn: 'title', // 遊び方画面から戻る先
     myIndex: 0,        // 自分の player index（ホスト/CPU戦=0、ゲスト=1）
     state: null,
     taken: [],         // 各ラウンドの勝者(絶対index / -1)
@@ -58,9 +60,16 @@
     UI.revealRound(result, G.myIndex, () => {
       if (G.state.finished) {
         const w = ENGINE.gameWinner(G.state);
-        recordResult(w);
         UI.renderGame(view(), { locked: true });
         UI.showResult(w, G.myIndex, G.state, G.names);
+        if (G.mode === 'story') {
+          const boss = STORY.BOSSES[G.bossIndex];
+          const won = w === G.myIndex;
+          if (won) STORY.clearBoss(G.bossIndex);
+          UI.decorateStoryResult(won ? boss.win : boss.lose, won ? 'もう一度戦う' : '再挑戦する');
+        } else {
+          recordResult(w);
+        }
       } else {
         startRound();
       }
@@ -78,6 +87,31 @@
     UI.setEmoteBarVisible(false);
     UI.showScreen('game');
     SOUND.play('start');
+    startRound();
+  }
+
+  // ---------- ストーリーモード ----------
+  function showStoryScreen() {
+    UI.hideResult();
+    UI.renderStory(i => {
+      SOUND.play('click');
+      UI.showDialogue(STORY.BOSSES[i], STORY.BOSSES[i].intro, () => startStoryGame(i));
+    });
+    UI.showScreen('story');
+  }
+
+  function startStoryGame(index) {
+    const boss = STORY.BOSSES[index];
+    G.mode = 'story'; G.level = boss.ai; G.bossIndex = index; G.myIndex = 0;
+    G.names = ['あなた', boss.name];
+    G.state = ENGINE.newGame(ENGINE.shufflePhases(boss.pool || undefined), boss.pot);
+    G.taken = [];
+    UI.clearLog();
+    UI.hideResult();
+    UI.setEmoteBarVisible(false);
+    UI.showScreen('game');
+    SOUND.play('start');
+    if (boss.pot > 0) UI.log(`${boss.name}が場に${boss.pot}点を積んだ！`);
     startRound();
   }
 
@@ -251,8 +285,18 @@
     switch (action) {
       case 'cpu-novice': startCpuGame('novice'); break;
       case 'cpu-hard': startCpuGame('hard'); break;
+      case 'story': showStoryScreen(); break;
       case 'online': setupLobby(); UI.showScreen('lobby'); break;
-      case 'rules': UI.renderRules(); UI.showScreen('rules'); break;
+      case 'rules':
+        G.rulesReturn = 'title';
+        UI.setRulesBackLabel('タイトルへ戻る');
+        UI.renderRules(0);
+        UI.showScreen('rules');
+        break;
+      case 'rules-back':
+        if (G.rulesReturn === 'game') UI.showScreen('game');
+        else { UI.renderTitleStats(loadStats()); UI.showScreen('title'); }
+        break;
       case 'back-title':
         if (G.mode === 'online') { ONLINE.close(); G.mode = null; }
         UI.hideResult();
@@ -264,7 +308,7 @@
   });
 
   UI.$('btn-confirm').addEventListener('click', () => {
-    if (G.mode === 'cpu') confirmCpu();
+    if (G.mode === 'cpu' || G.mode === 'story') confirmCpu();
     else if (G.mode === 'online') confirmOnline().catch(console.error);
   });
 
@@ -287,11 +331,74 @@
     UI.showEmote('me', i);
   });
 
+  // ---------- 中断メニュー ----------
+  const forfeitBtn = UI.$('btn-forfeit');
+  function resetForfeit() {
+    forfeitBtn.textContent = '投了する';
+    forfeitBtn.classList.remove('confirm');
+  }
+  function syncPauseSound() {
+    UI.$('btn-pause-sound').textContent = `効果音：${SOUND.muted ? 'OFF' : 'ON'}`;
+  }
+  UI.$('btn-pause').addEventListener('click', () => {
+    resetForfeit();
+    syncPauseSound();
+    UI.$('pause-overlay').classList.remove('hidden');
+    SOUND.play('click');
+  });
+  UI.$('btn-resume').addEventListener('click', () => {
+    UI.$('pause-overlay').classList.add('hidden');
+    SOUND.play('click');
+  });
+  UI.$('btn-pause-rules').addEventListener('click', () => {
+    UI.$('pause-overlay').classList.add('hidden');
+    G.rulesReturn = 'game';
+    UI.setRulesBackLabel('対戦に戻る');
+    UI.renderRules(0);
+    UI.showScreen('rules');
+    SOUND.play('click');
+  });
+  UI.$('btn-pause-sound').addEventListener('click', () => {
+    SOUND.toggleMute();
+    syncPauseSound();
+    syncSoundBtn();
+    SOUND.play('click');
+  });
+  forfeitBtn.addEventListener('click', () => {
+    if (!forfeitBtn.classList.contains('confirm')) {
+      forfeitBtn.textContent = '本当に投了する？';
+      forfeitBtn.classList.add('confirm');
+      return;
+    }
+    // 投了確定
+    const mode = G.mode;
+    UI.$('pause-overlay').classList.add('hidden');
+    resetForfeit();
+    if (mode === 'online') {
+      recordResult(1 - G.myIndex); // 投了は負け扱い
+      ONLINE.close();
+    } else if (mode === 'cpu') {
+      recordResult(1 - G.myIndex);
+    }
+    G.mode = null;
+    if (mode === 'story') showStoryScreen();
+    else {
+      UI.renderTitleStats(loadStats());
+      UI.showScreen('title');
+    }
+  });
+
   // 初期表示
   UI.renderTitleStats(loadStats());
 
+  UI.$('btn-story-back').addEventListener('click', () => {
+    G.mode = null;
+    showStoryScreen();
+  });
+
   UI.$('btn-rematch').addEventListener('click', () => {
     if (G.mode === 'cpu') startCpuGame(G.level);
+    else if (G.mode === 'story') startStoryGame(G.bossIndex);
     else if (G.mode === 'online') {
       G.myRematch = true;
       ONLINE.send({ t: 'rematch' });

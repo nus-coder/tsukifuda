@@ -15,22 +15,22 @@ const ENGINE = (() => {
     { moon: 'eclipse', value: 4 },
   ];
 
-  // 乱数（オンライン時はホストのシャッフル結果を共有するので、ここは再現性不要）
-  function shufflePhases(rng = Math.random) {
-    const deck = PHASE_POOL.map(p => ({ ...p }));
+  // 月齢デッキをシャッフル。pool を渡すとカスタム構成（ストーリーモードのボス用）
+  function shufflePhases(pool = PHASE_POOL) {
+    const deck = pool.map(p => ({ ...p }));
     for (let i = deck.length - 1; i > 0; i--) {
-      const j = Math.floor(rng() * (i + 1));
+      const j = Math.floor(Math.random() * (i + 1));
       [deck[i], deck[j]] = [deck[j], deck[i]];
     }
     return deck;
   }
 
-  // 初期状態。players[0]/players[1] は対称。
-  function newGame(phases) {
+  // 初期状態。players[0]/players[1] は対称。startPot はストーリーモードのギミック用
+  function newGame(phases, startPot = 0) {
     return {
       phases,                       // 12枚の月齢カード（全公開）
       round: 0,                     // 0-indexed。12で終了
-      pot: 0,                       // 持ち越し月光点
+      pot: startPot,                // 持ち越し月光点
       players: [
         { hand: [...Array(12).keys()], score: 0, buff: 0 }, // hand はカードid(=パワー)の配列
         { hand: [...Array(12).keys()], score: 0, buff: 0 }, // buff: 侍の霊による次ラウンド+2
