@@ -81,5 +81,99 @@ const SOUND = (() => {
     return muted;
   }
 
-  return { play, toggleMute, get muted() { return muted; } };
+  // ===== BGM（生成音楽・音源ファイル不要） =====
+  // 陰旋法（A, B♭, D, E, F）の琴風プラック＋低音ドローン＋エコー。
+  // ランダム生成なので同じフレーズは二度と鳴らない。
+  let bgmOn = localStorage.getItem('tsukifuda-bgm') !== '0'; // 既定ON（初回操作後に開始）
+  let bgm = null; // { master, drone: [osc], timer }
+
+  const SCALE = [220.0, 233.1, 293.7, 329.6, 349.2, 440.0, 466.2, 587.3]; // A3陰旋法+オクターブ
+
+  function pluck(c, dest, freq, when, gain) {
+    const osc = c.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.value = freq;
+    const f = c.createBiquadFilter();
+    f.type = 'lowpass';
+    f.frequency.setValueAtTime(freq * 6, when);
+    f.frequency.exponentialRampToValueAtTime(freq * 1.5, when + 1.2);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0, when);
+    g.gain.linearRampToValueAtTime(gain, when + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + 1.6);
+    osc.connect(f); f.connect(g); g.connect(dest);
+    osc.start(when); osc.stop(when + 1.8);
+  }
+
+  function startBgm() {
+    if (bgm || !bgmOn) return;
+    const c = ac();
+    const master = c.createGain();
+    master.gain.value = 0;
+    master.gain.linearRampToValueAtTime(0.5, c.currentTime + 2.5); // フェードイン
+    master.connect(c.destination);
+
+    // エコー（琴の残響）
+    const delay = c.createDelay(1.0);
+    delay.delayTime.value = 0.42;
+    const fb = c.createGain(); fb.gain.value = 0.32;
+    const wet = c.createGain(); wet.gain.value = 0.35;
+    delay.connect(fb); fb.connect(delay); delay.connect(wet); wet.connect(master);
+
+    // 低音ドローン（夜の底）
+    const drone = [55, 110.3].map(fr => {
+      const o = c.createOscillator();
+      o.type = 'sine'; o.frequency.value = fr;
+      const g = c.createGain(); g.gain.value = fr < 100 ? 0.05 : 0.025;
+      o.connect(g); g.connect(master);
+      o.start();
+      return o;
+    });
+
+    // フレーズ生成: 1〜3音の小節をランダムな間で置いていく
+    let stopped = false;
+    const inst = { master, drone, stop: () => { stopped = true; } };
+    (function phrase() {
+      if (stopped) return;
+      const t0 = c.currentTime + 0.05;
+      const notes = 1 + Math.floor(Math.random() * 3);
+      let base = Math.floor(Math.random() * SCALE.length);
+      for (let i = 0; i < notes; i++) {
+        const idx = Math.min(SCALE.length - 1, Math.max(0, base + Math.floor(Math.random() * 5) - 2));
+        const out = c.createGain(); out.gain.value = 1;
+        out.connect(master); out.connect(delay);
+        pluck(c, out, SCALE[idx], t0 + i * (0.35 + Math.random() * 0.3), 0.10 + Math.random() * 0.05);
+        base = idx;
+      }
+      inst.timer = setTimeout(phrase, 2200 + Math.random() * 2800);
+    })();
+    bgm = inst;
+  }
+
+  function stopBgm() {
+    if (!bgm) return;
+    try {
+      bgm.stop();
+      clearTimeout(bgm.timer);
+      const c = ac();
+      bgm.master.gain.cancelScheduledValues(c.currentTime);
+      bgm.master.gain.setValueAtTime(bgm.master.gain.value, c.currentTime);
+      bgm.master.gain.linearRampToValueAtTime(0, c.currentTime + 0.8);
+      const m = bgm.master, d = bgm.drone;
+      setTimeout(() => { d.forEach(o => { try { o.stop(); } catch (_) {} }); m.disconnect(); }, 900);
+    } catch (_) {}
+    bgm = null;
+  }
+
+  function toggleBgm() {
+    bgmOn = !bgmOn;
+    localStorage.setItem('tsukifuda-bgm', bgmOn ? '1' : '0');
+    if (bgmOn) startBgm(); else stopBgm();
+    return bgmOn;
+  }
+
+  return {
+    play, toggleMute, get muted() { return muted; },
+    startBgm, toggleBgm, get bgmOn() { return bgmOn; }, get bgmPlaying() { return !!bgm; },
+  };
 })();

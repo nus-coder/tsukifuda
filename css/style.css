@@ -248,6 +248,7 @@ body {
   background: rgba(24, 22, 42, .7); border: 1px solid var(--border); border-radius: 50%;
 }
 .sound-toggle.off { filter: grayscale(1) opacity(.55); }
+.music-toggle { right: 58px; }
 
 /* 得点フロート */
 .float-text {

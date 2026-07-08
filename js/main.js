@@ -321,6 +321,13 @@
   soundBtn.addEventListener('click', () => { SOUND.toggleMute(); syncSoundBtn(); SOUND.play('click'); });
   syncSoundBtn();
 
+  // BGMトグル（ブラウザの自動再生制限があるため、初回クリック後に開始する）
+  const musicBtn = UI.$('btn-music');
+  const syncMusicBtn = () => musicBtn.classList.toggle('off', !SOUND.bgmOn);
+  musicBtn.addEventListener('click', () => { SOUND.toggleBgm(); syncMusicBtn(); });
+  syncMusicBtn();
+  document.addEventListener('click', () => SOUND.startBgm(), { once: true });
+
   // 絵文字リアクション（オンライン戦のみ表示、連打は1.5秒に1回まで）
   let lastEmoteAt = 0;
   UI.renderEmoteBar(i => {
@@ -339,6 +346,7 @@
   }
   function syncPauseSound() {
     UI.$('btn-pause-sound').textContent = `効果音：${SOUND.muted ? 'OFF' : 'ON'}`;
+    UI.$('btn-pause-bgm').textContent = `BGM：${SOUND.bgmOn ? 'ON' : 'OFF'}`;
   }
   UI.$('btn-pause').addEventListener('click', () => {
     resetForfeit();
@@ -362,6 +370,12 @@
     SOUND.toggleMute();
     syncPauseSound();
     syncSoundBtn();
+    SOUND.play('click');
+  });
+  UI.$('btn-pause-bgm').addEventListener('click', () => {
+    SOUND.toggleBgm();
+    syncPauseSound();
+    syncMusicBtn();
     SOUND.play('click');
   });
   forfeitBtn.addEventListener('click', () => {
@@ -390,6 +404,7 @@
 
   // 初期表示
   UI.renderTitleStats(loadStats());
+  FX.setAmbient(true); // 初期表示はタイトルなので蛍を飛ばす
 
   UI.$('btn-story-back').addEventListener('click', () => {
     G.mode = null;

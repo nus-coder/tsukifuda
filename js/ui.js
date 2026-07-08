@@ -8,6 +8,7 @@ const UI = (() => {
   function showScreen(name) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     $(`screen-${name}`).classList.add('active');
+    FX.setAmbient(name === 'title'); // タイトルでは蛍を飛ばす
   }
 
   // ---------- 月齢アイコン ----------
@@ -176,12 +177,14 @@ const UI = (() => {
         m.className = 'mist';
         bz.appendChild(m);
         setTimeout(() => m.remove(), 2300);
+        FX.mist(bz.getBoundingClientRect());
       }
       // 人狼の変身（満月）
       [0, 1].forEach(i => {
         if (result.picks[i] === 8 && result.phase.moon === 'full' && !result.canceled[i]) {
           cardEl(i).classList.add('wolf-transform');
           floatText(cardEl(i), '+5', 'big');
+          FX.ring(cardEl(i).getBoundingClientRect());
         }
       });
       // ねずみ小僧の下剋上
@@ -215,13 +218,17 @@ const UI = (() => {
           floatText(iWon ? $('my-score') : $('opp-score'), '灯が消えた…', 'bad');
         } else {
           floatText(iWon ? $('my-score') : $('opp-score'), `+${result.stake}`, result.stake >= 5 ? 'big' : '');
-          if (result.stake >= 5) { flashFx('bigwin'); shake(); SOUND.play('pot'); }
+          FX.burst((iWon ? myCard : oppCard).getBoundingClientRect());
+          if (result.stake >= 5) { flashFx('bigwin'); shake(); SOUND.play('pot'); FX.shower(); }
         }
         if (result.events.includes('tengu') || result.events.includes('kappa')) setTimeout(() => SOUND.play('coin'), 350);
         if (result.events.includes('orochi')) {
           setTimeout(() => {
             SOUND.play('steal');
             floatText(iWon ? $('opp-score') : $('my-score'), '-1', 'bad');
+            const from = (iWon ? $('opp-score') : $('my-score')).getBoundingClientRect();
+            const to = (iWon ? $('my-score') : $('opp-score')).getBoundingClientRect();
+            FX.steal(from, to);
           }, 500);
         }
       }
