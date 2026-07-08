@@ -318,13 +318,22 @@
     soundBtn.textContent = SOUND.muted ? '🔇' : '🔊';
     soundBtn.classList.toggle('off', SOUND.muted);
   };
-  soundBtn.addEventListener('click', () => { SOUND.toggleMute(); syncSoundBtn(); SOUND.play('click'); });
+  soundBtn.addEventListener('click', () => {
+    SOUND.toggleMute();
+    syncSoundBtn();
+    UI.floatText(soundBtn, `効果音 ${SOUND.muted ? 'OFF' : 'ON'}`, SOUND.muted ? 'bad' : '');
+    SOUND.play('click');
+  });
   syncSoundBtn();
 
   // BGMトグル（ブラウザの自動再生制限があるため、初回クリック後に開始する）
   const musicBtn = UI.$('btn-music');
   const syncMusicBtn = () => musicBtn.classList.toggle('off', !SOUND.bgmOn);
-  musicBtn.addEventListener('click', () => { SOUND.toggleBgm(); syncMusicBtn(); });
+  musicBtn.addEventListener('click', () => {
+    SOUND.toggleBgm();
+    syncMusicBtn();
+    UI.floatText(musicBtn, `BGM ${SOUND.bgmOn ? 'ON' : 'OFF'}`, SOUND.bgmOn ? '' : 'bad');
+  });
   syncMusicBtn();
   document.addEventListener('click', () => SOUND.startBgm(), { once: true });
 

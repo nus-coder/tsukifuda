@@ -129,9 +129,12 @@ const UI = (() => {
     const el = document.createElement('div');
     el.className = `float-text ${cls}`;
     el.textContent = text;
-    el.style.left = (r.left + r.width / 2 - 20) + 'px';
-    el.style.top = (r.top - 8) + 'px';
     document.body.appendChild(el);
+    // 画面上端付近のアンカーは下方向に流す（音量ボタンのトースト等）
+    const down = r.top < 80;
+    if (down) el.classList.add('down');
+    el.style.left = Math.min(r.left + r.width / 2 - 20, window.innerWidth - el.offsetWidth - 8) + 'px';
+    el.style.top = (down ? r.bottom + 6 : r.top - 8) + 'px';
     setTimeout(() => el.remove(), 1400);
   }
 
@@ -454,6 +457,6 @@ const UI = (() => {
     showScreen, renderGame, markSelected, setHint, setConfirmVisible,
     revealRound, log, clearLog, showResult, hideResult, renderRules, $,
     phaseAmbience, renderEmoteBar, setEmoteBarVisible, showEmote, renderTitleStats,
-    setRulesBackLabel, renderStory, showDialogue, decorateStoryResult,
+    setRulesBackLabel, renderStory, showDialogue, decorateStoryResult, floatText,
   };
 })();

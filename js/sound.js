@@ -260,11 +260,12 @@ const SOUND = (() => {
     try {
       clearInterval(bgm.timer);
       const c = ac();
+      // 「押したら即止まる」体感のため、フェードはごく短く
       bgm.master.gain.cancelScheduledValues(c.currentTime);
       bgm.master.gain.setValueAtTime(bgm.master.gain.value, c.currentTime);
-      bgm.master.gain.linearRampToValueAtTime(0, c.currentTime + 0.9);
+      bgm.master.gain.linearRampToValueAtTime(0, c.currentTime + 0.15);
       const m = bgm.master, cp = bgm.comp;
-      setTimeout(() => { m.disconnect(); cp.disconnect(); }, 1100);
+      setTimeout(() => { m.disconnect(); cp.disconnect(); }, 300);
     } catch (_) {}
     bgm = null;
   }
