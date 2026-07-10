@@ -9,6 +9,17 @@
 
 const ONLINE = (() => {
   const PREFIX = 'tsukifuda-v1-';
+  // NAT越え用のICEサーバー。既定はSTUNのみ（無料・登録不要）。
+  // 厳しいNAT同士（モバイル回線⇔家庭Wi-Fi等）で繋がらない場合は、
+  // TURNサーバーをここに追加する（例: metered.ca の無料プラン）:
+  //   { urls: 'turn:xxx.metered.ca:443', username: '...', credential: '...' },
+  const ICE_SERVERS = [
+    { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
+    { urls: 'stun:stun.cloudflare.com:3478' },
+  ];
+  const PEER_OPTS = { config: { iceServers: ICE_SERVERS } };
+  const CONNECT_TIMEOUT = 15000; // データチャネル確立の待ち時間
+
   let peer = null, conn = null;
   let handlers = {};
 
@@ -47,12 +58,20 @@ const ONLINE = (() => {
   function host(h) {
     handlers = h;
     const code = randomCode();
-    peer = new Peer(PREFIX + code);
+    peer = new Peer(PREFIX + code, PEER_OPTS);
     peer.on('open', () => h.onReady?.(code));
     peer.on('connection', c => {
       if (conn) { c.close(); return; } // 3人目は拒否
       wireConn(c);
-      c.on('open', () => h.onConnected?.());
+      // 相手は来たがP2Pが確立しない（NAT越え失敗）ケースを検出
+      const t = setTimeout(() => {
+        if (!c.open) {
+          try { c.close(); } catch (_) {}
+          conn = null;
+          h.onError?.({ type: 'connect-timeout' });
+        }
+      }, CONNECT_TIMEOUT);
+      c.on('open', () => { clearTimeout(t); h.onConnected?.(); });
     });
     peer.on('error', e => h.onError?.(e));
     return code;
@@ -61,11 +80,14 @@ const ONLINE = (() => {
   // 部屋に入る（ゲスト = player1）
   function join(code, h) {
     handlers = h;
-    peer = new Peer();
+    peer = new Peer(PEER_OPTS);
     peer.on('open', () => {
       const c = peer.connect(PREFIX + code.toUpperCase(), { reliable: true });
       wireConn(c);
-      c.on('open', () => h.onConnected?.());
+      const t = setTimeout(() => {
+        if (!c.open) h.onError?.({ type: 'connect-timeout' });
+      }, CONNECT_TIMEOUT);
+      c.on('open', () => { clearTimeout(t); h.onConnected?.(); });
     });
     peer.on('error', e => h.onError?.(e));
   }

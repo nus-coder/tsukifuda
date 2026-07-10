@@ -143,8 +143,9 @@
     onDisconnect: () => abortOnline('相手との接続が切れました。'),
     onError: e => {
       console.error(e);
-      if (e?.type === 'peer-unavailable') lobbyStatus('その合言葉の部屋が見つかりません。', true);
+      if (e?.type === 'peer-unavailable') lobbyStatus('その合言葉の部屋が見つかりません。コードを確認してください。', true);
       else if (e?.type === 'unavailable-id') lobbyStatus('部屋の作成に失敗しました。もう一度お試しください。', true);
+      else if (e?.type === 'connect-timeout') lobbyStatus('相手が見つかりましたが、P2P接続を確立できませんでした。回線の組み合わせによっては繋がらないことがあります（同じWi-Fiなら高確率で繋がります）。', true);
       else lobbyStatus('接続エラー：ネットワークを確認してください。', true);
     },
   };
