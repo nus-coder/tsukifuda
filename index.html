@@ -6,6 +6,11 @@
 <title>ツキフダ 〜月夜の十二番勝負〜</title>
 <link rel="stylesheet" href="css/style.css?v=9">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='40' fill='%23f5e6a8'/></svg>">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0d0b1e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ツキフダ">
 </head>
 <body>
 
@@ -30,6 +35,17 @@
     <button class="btn" data-action="online">ふたりで遊ぶ（オンライン対戦）</button>
     <button class="btn btn-sub" data-action="rules">遊び方</button>
   </nav>
+  <!-- PWAホーム画面追加バナー（beforeinstallprompt発火時のみ表示） -->
+  <div id="install-banner" class="install-banner" hidden>
+    <p class="install-banner__lead">端末に灯をともす</p>
+    <button type="button" class="btn install-banner__btn" id="install-btn">
+      <span class="install-banner__moon" aria-hidden="true">🌕</span>
+      ホーム画面に追加する
+    </button>
+    <button type="button" class="btn-sub install-banner__dismiss" id="install-dismiss" aria-label="インストール案内を閉じる">
+      今はしない
+    </button>
+  </div>
   <p class="credit">同じ12枚の手札で読み合う、月光点の争奪戦。</p>
   <div id="title-stats" class="title-stats"></div>
   <div class="shooting-star" style="--delay:2s; --top:12%"></div>
@@ -173,5 +189,6 @@
 <script src="js/ui.js?v=9"></script>
 <script src="js/online.js?v=9"></script>
 <script src="js/main.js?v=9"></script>
+<script src="js/pwa.js"></script>
 </body>
 </html>

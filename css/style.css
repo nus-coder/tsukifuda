@@ -84,6 +84,72 @@ body:not([data-screen="game"]) #btn-pause { visibility: hidden; }
 .btn-sub { background: transparent; border-color: #39335c; color: var(--dim); }
 .btn-confirm { background: linear-gradient(160deg, #a83a52, #7d2a3d); border-color: var(--accent); font-size: 17px; }
 
+/* ===== PWAインストールバナー ===== */
+.install-banner {
+  display: none;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .install-banner.is-visible {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    margin: 20px auto 12px;
+    padding: 14px 18px 12px;
+    max-width: 300px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    animation: install-glow 3.6s ease-in-out infinite;
+  }
+}
+
+@media (display-mode: standalone), (display-mode: fullscreen) {
+  .install-banner { display: none !important; }
+}
+
+.install-banner__lead {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: .25em;
+  color: var(--dim);
+}
+
+.install-banner__btn {
+  width: 100%;
+  font-size: 14px;
+  letter-spacing: .1em;
+  border-color: var(--moon);
+  color: var(--moon);
+}
+
+.install-banner__moon {
+  display: inline-block;
+  margin-right: 6px;
+  animation: install-moon-pulse 3.6s ease-in-out infinite;
+}
+
+.install-banner__dismiss {
+  font-size: 11px;
+  padding: 4px 10px;
+}
+
+@keyframes install-glow {
+  0%, 100% { box-shadow: 0 0 6px rgba(245, 230, 168, .08); }
+  50%       { box-shadow: 0 0 16px rgba(245, 230, 168, .22); }
+}
+
+@keyframes install-moon-pulse {
+  0%, 100% { filter: drop-shadow(0 0 3px rgba(245, 230, 168, .35)); transform: scale(1); }
+  50%       { filter: drop-shadow(0 0 7px rgba(245, 230, 168, .7));  transform: scale(1.06); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .install-banner.is-visible,
+  .install-banner__moon { animation: none; }
+}
+
 /* ===== ルール / ロビー ===== */
 .rules-panel, .lobby-panel {
   background: var(--panel); border: 1px solid var(--border); border-radius: 16px;
