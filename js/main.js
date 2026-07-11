@@ -338,6 +338,9 @@
   syncMusicBtn();
   document.addEventListener('click', () => SOUND.startBgm(), { once: true });
 
+  // アプリを離れたら音を止める（バックグラウンド再生しない）
+  document.addEventListener('visibilitychange', () => SOUND.setBackground(document.hidden));
+
   // 絵文字リアクション（オンライン戦のみ表示、連打は1.5秒に1回まで）
   let lastEmoteAt = 0;
   UI.renderEmoteBar(i => {

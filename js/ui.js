@@ -8,6 +8,7 @@ const UI = (() => {
   function showScreen(name) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     $(`screen-${name}`).classList.add('active');
+    document.body.dataset.screen = name; // ☰ボタンの表示制御などに使う
     FX.setAmbient(name === 'title'); // タイトルでは蛍を飛ばす
   }
 
@@ -289,7 +290,6 @@ const UI = (() => {
 
   // ---------- 絵文字リアクション ----------
   const EMOTES = ['😼', '🔥', '😱', '🙏', '😆', '🌕'];
-  let emoteTimers = { me: null, opp: null };
 
   function renderEmoteBar(onSend) {
     const bar = $('emote-bar');
@@ -303,14 +303,14 @@ const UI = (() => {
   }
   function setEmoteBarVisible(v) { $('emote-bar').classList.toggle('hidden', !v); }
 
+  // スタンプは画面中央にフロート表示（相手=上寄り / 自分=下寄り）
   function showEmote(side, index) {
     if (!(index >= 0 && index < EMOTES.length)) return;
-    const el = $(side === 'me' ? 'emote-me' : 'emote-opp');
+    const el = document.createElement('div');
+    el.className = `emote-float ${side === 'me' ? 'me' : 'opp'}`;
     el.textContent = EMOTES[index];
-    el.classList.remove('hidden');
-    void el.offsetWidth; // アニメ再始動
-    clearTimeout(emoteTimers[side]);
-    emoteTimers[side] = setTimeout(() => el.classList.add('hidden'), 2200);
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 2300);
     SOUND.play('emote');
   }
 

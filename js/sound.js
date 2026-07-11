@@ -277,8 +277,18 @@ const SOUND = (() => {
     return bgmOn;
   }
 
+  // アプリがバックグラウンドに回ったら音声全体を停止（復帰で再開）
+  function setBackground(hidden) {
+    if (!ctx) return;
+    try {
+      if (hidden) ctx.suspend();
+      else if (ctx.state === 'suspended') ctx.resume();
+    } catch (_) {}
+  }
+
   return {
     play, toggleMute, get muted() { return muted; },
     startBgm, toggleBgm, get bgmOn() { return bgmOn; }, get bgmPlaying() { return !!bgm; },
+    setBackground,
   };
 })();
