@@ -9,13 +9,16 @@
 
 const ONLINE = (() => {
   const PREFIX = 'tsukifuda-v1-';
-  // NAT越え用のICEサーバー。既定はSTUNのみ（無料・登録不要）。
-  // 厳しいNAT同士（モバイル回線⇔家庭Wi-Fi等）で繋がらない場合は、
-  // TURNサーバーをここに追加する（例: metered.ca の無料プラン）:
-  //   { urls: 'turn:xxx.metered.ca:443', username: '...', credential: '...' },
+  // NAT越え用のICEサーバー。STUNで直結を試み、失敗したらTURN(metered.ca無料枠)で中継する。
+  // TURNの認証情報はクライアントに配布する前提の値（公開ページのJSに埋め込む形が正）。
   const ICE_SERVERS = [
     { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
     { urls: 'stun:stun.cloudflare.com:3478' },
+    { urls: 'stun:stun.relay.metered.ca:80' },
+    { urls: 'turn:global.relay.metered.ca:80', username: '62b73ed39560e8136bee9e8c', credential: 'pfEIEXLeecVkYoQd' },
+    { urls: 'turn:global.relay.metered.ca:80?transport=tcp', username: '62b73ed39560e8136bee9e8c', credential: 'pfEIEXLeecVkYoQd' },
+    { urls: 'turn:global.relay.metered.ca:443', username: '62b73ed39560e8136bee9e8c', credential: 'pfEIEXLeecVkYoQd' },
+    { urls: 'turns:global.relay.metered.ca:443?transport=tcp', username: '62b73ed39560e8136bee9e8c', credential: 'pfEIEXLeecVkYoQd' },
   ];
   const PEER_OPTS = { config: { iceServers: ICE_SERVERS } };
   const CONNECT_TIMEOUT = 15000; // データチャネル確立の待ち時間
