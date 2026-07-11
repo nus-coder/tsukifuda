@@ -382,6 +382,74 @@ body:not([data-screen="game"]) #btn-pause { visibility: hidden; }
 .fx-overlay.fx-bigwin { background: radial-gradient(circle, rgba(232,201,62,.22), transparent 70%); animation: fxFade 1s ease-out; }
 @keyframes fxFade { 0% { opacity: 0; } 25% { opacity: 1; } 100% { opacity: 0; } }
 
+/* 大勝負カットイン（賭点5点以上、公開直前のタメ演出） */
+.cutin { position: fixed; inset: 0; z-index: 20; pointer-events: none; }
+.cutin-dim {
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse at center, rgba(10,8,24,.55) 0%, rgba(10,8,24,.8) 100%);
+  opacity: 0;
+}
+.cutin-banner {
+  position: absolute; top: 50%; left: 0; right: 0; height: clamp(90px, 18vh, 130px);
+  margin-top: calc(clamp(90px, 18vh, 130px) / -2);
+  transform: translateX(115%) rotate(-6deg);
+  background: linear-gradient(90deg, transparent 0%, rgba(24,22,42,.95) 12%, rgba(24,22,42,.95) 88%, transparent 100%);
+  border-top: 2px solid var(--gold); border-bottom: 2px solid var(--gold);
+  display: flex; align-items: center; justify-content: center; overflow: hidden;
+}
+.cutin-banner::before {
+  content: ''; position: absolute; inset: -20% -10%;
+  background: repeating-linear-gradient(90deg, transparent 0 26px, rgba(245, 230, 168, .1) 26px 28px);
+}
+.cutin-text { display: flex; align-items: baseline; gap: 18px; }
+.cutin-phrase {
+  color: var(--moon); text-shadow: 0 0 18px var(--gold);
+  font-weight: 900; font-size: clamp(28px, 6vw, 44px); letter-spacing: .12em; white-space: nowrap;
+}
+.cutin-stake {
+  color: var(--gold); font-weight: 900; font-size: clamp(38px, 8vw, 60px);
+  text-shadow: 0 0 6px var(--accent), 0 0 20px var(--gold);
+  transform: scale(1.4); opacity: 0; white-space: nowrap;
+}
+.cutin.play .cutin-dim { animation: cutinDim .84s linear; }
+.cutin.play .cutin-banner { animation: cutinBanner .84s both; }
+.cutin.play .cutin-banner::before { animation: cutinLines .84s linear; }
+.cutin.play .cutin-stake { animation: cutinStake .84s both; }
+.cutin.play.escalate .cutin-banner { border-color: var(--accent); }
+.cutin.play.escalate .cutin-stake { animation: cutinStake .84s both, cutinGlowPulse .84s both; }
+
+@keyframes cutinDim { 0% { opacity: 0; } 12% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes cutinLines { from { background-position: 0 0; } to { background-position: -60px 0; } }
+@keyframes cutinBanner {
+  0%, 7%    { transform: translateX(115%) rotate(-6deg); animation-timing-function: cubic-bezier(.1,.9,.15,1.15); }
+  26%       { transform: translateX(0) rotate(-6deg); animation-timing-function: linear; }
+  78%       { transform: translateX(-1.2%) rotate(-6deg); animation-timing-function: cubic-bezier(.7,0,1,.5); }
+  94%, 100% { transform: translateX(-130%) rotate(-6deg); }
+}
+@keyframes cutinStake {
+  0%, 24% { transform: scale(1.4); opacity: 0; }
+  26%     { opacity: 1; }
+  38%     { transform: scale(1); animation-timing-function: cubic-bezier(.34,1.56,.64,1); }
+  100%    { transform: scale(1); }
+}
+@keyframes cutinGlowPulse {
+  0%, 24%   { text-shadow: 0 0 6px var(--accent), 0 0 20px var(--gold); }
+  40%       { text-shadow: 0 0 14px var(--accent), 0 0 34px var(--gold); }
+  55%       { text-shadow: 0 0 6px var(--accent), 0 0 20px var(--gold); }
+  70%       { text-shadow: 0 0 14px var(--accent), 0 0 34px var(--gold); }
+  85%, 100% { text-shadow: 0 0 6px var(--accent), 0 0 20px var(--gold); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cutin.play .cutin-dim,
+  .cutin.play .cutin-banner,
+  .cutin.play .cutin-banner::before,
+  .cutin.play .cutin-stake {
+    animation: cutinReducedPulse .3s ease-out !important;
+    transform: none !important;
+  }
+}
+@keyframes cutinReducedPulse { 0% { opacity: 0; } 40% { opacity: 1; } 100% { opacity: 0; } }
+
 /* 画面シェイク（大ポット決着） */
 .game-layout.shake { animation: shake .5s ease-in-out; }
 @keyframes shake {

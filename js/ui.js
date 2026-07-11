@@ -168,9 +168,33 @@ const UI = (() => {
     else if (phase.moon === 'new') flashFx('new');
   }
 
+  // 大勝負カットイン（賭点5点以上、公開直前のタメ演出）
+  function showCutIn(stake, done) {
+    const el = $('cutin');
+    const escalate = stake >= 8;
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    $('cutin-phrase').textContent = escalate ? '逢魔ヶ刻' : '月下大勝負';
+    $('cutin-stake').textContent = `${stake}点`;
+    el.classList.remove('hidden', 'play', 'escalate');
+    void el.offsetWidth;
+    el.classList.toggle('escalate', escalate);
+    el.classList.add('play');
+    SOUND.play(escalate ? 'tensionBig' : 'tension');
+    setTimeout(() => {
+      el.classList.remove('play', 'escalate');
+      el.classList.add('hidden');
+      done();
+    }, reduced ? 300 : 840);
+  }
+
   // ---------- ラウンド公開演出 ----------
   // result: ENGINE.resolveRound の result。myIndex 視点で表示。
   function revealRound(result, myIndex, done) {
+    if (result.stake >= 5) { showCutIn(result.stake, () => doReveal(result, myIndex, done)); return; }
+    doReveal(result, myIndex, done);
+  }
+
+  function doReveal(result, myIndex, done) {
     const myPick = result.picks[myIndex];
     const oppPick = result.picks[1 - myIndex];
 
