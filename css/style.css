@@ -158,6 +158,22 @@ body:not([data-screen="game"]) #btn-pause { visibility: hidden; }
 }
 .center-info { text-align: center; min-width: 130px; }
 .round-label { color: var(--dim); font-size: 13px; letter-spacing: .2em; }
+.phase-alert {
+  display: inline-block; font-size: 12.5px; font-weight: 700; border-radius: 8px;
+  padding: 3px 10px; margin: 2px 0;
+}
+.phase-alert.alert-new {
+  background: rgba(96, 60, 160, .35); border: 1px solid #8f86c4; color: #cfc4f0;
+  animation: alertPulse 1.6s ease-in-out infinite;
+}
+.phase-alert.alert-eclipse {
+  background: rgba(160, 40, 60, .35); border: 1px solid #c94f6a; color: #f0c4cf;
+  animation: alertPulse 1.6s ease-in-out infinite;
+}
+.phase-alert.alert-full {
+  background: rgba(232, 201, 62, .15); border: 1px solid #a89440; color: #e8d98a;
+}
+@keyframes alertPulse { 0%,100% { opacity: 1; } 50% { opacity: .55; } }
 .stake-label { color: var(--moon); font-size: 26px; font-weight: 800; margin: 4px 0; }
 .pot-label { color: var(--accent); font-size: 14px; font-weight: 700; min-height: 20px; }
 
@@ -174,8 +190,8 @@ body:not([data-screen="game"]) #btn-pause { visibility: hidden; }
   display: flex; flex-direction: column; flex: 0 0 auto;
   box-shadow: 0 4px 14px rgba(0,0,0,.5);
 }
-.card .art { flex: 0 0 58%; }
-.card .art svg { width: 100%; height: 100%; display: block; }
+.card .art { flex: 0 0 58%; min-height: 0; overflow: hidden; position: relative; }
+.card .art svg { width: 100%; height: 100%; display: block; position: absolute; inset: 0; }
 .card .power {
   position: absolute; top: 4px; left: 6px; width: 30px; height: 30px; border-radius: 50%;
   background: radial-gradient(circle at 38% 32%, #fff6cf, var(--moon) 65%, #cbb268);
@@ -483,6 +499,7 @@ body:not([data-screen="game"]) #btn-pause { visibility: hidden; }
   /* 中央情報とラベルの改行・圧迫を解消 */
   .center-info { min-width: 92px; }
   .round-label { font-size: 11px; letter-spacing: .05em; }
+  .phase-alert { font-size: 11px; }
   .stake-label { font-size: 20px; margin: 2px 0; }
   .pot-label { font-size: 12px; min-height: 16px; }
   .player-label { font-size: 12px; gap: 6px; padding: 1px 4px; }

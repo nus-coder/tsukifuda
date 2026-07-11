@@ -19,6 +19,7 @@
     revealSent: false,
     myRematch: false,
     theirRematch: false,
+    resultRecorded: false, // 結果の二重記録防止
   };
 
   // ---------- 戦績 (localStorage) ----------
@@ -27,6 +28,7 @@
     try { return JSON.parse(localStorage.getItem(STATS_KEY)) || {}; } catch (_) { return {}; }
   }
   function recordResult(winner) {
+    if (G.resultRecorded) return;
     const mode = G.mode === 'cpu' ? G.level : 'online';
     const stats = loadStats();
     const s = stats[mode] ?? (stats[mode] = { w: 0, l: 0, d: 0 });
@@ -34,6 +36,7 @@
     else if (winner === G.myIndex) s.w++;
     else s.l++;
     localStorage.setItem(STATS_KEY, JSON.stringify(stats));
+    G.resultRecorded = true;
   }
 
   // ---------- 共通ヘルパ ----------
@@ -82,6 +85,8 @@
     G.names = ['あなた', level === 'hard' ? 'CPU 大妖怪' : 'CPU 見習い妖怪'];
     G.state = ENGINE.newGame(ENGINE.shufflePhases());
     G.taken = [];
+    G.resultRecorded = false;
+    UI.$('btn-rematch').disabled = false;
     UI.clearLog();
     UI.hideResult();
     UI.setEmoteBarVisible(false);
@@ -106,6 +111,8 @@
     G.names = ['あなた', boss.name];
     G.state = ENGINE.newGame(ENGINE.shufflePhases(boss.pool || undefined), boss.pot);
     G.taken = [];
+    G.resultRecorded = false;
+    UI.$('btn-rematch').disabled = false;
     UI.clearLog();
     UI.hideResult();
     UI.setEmoteBarVisible(false);
@@ -152,9 +159,21 @@
 
   function abortOnline(message) {
     if (G.mode !== 'online') return;
+    if (G.state?.finished) {
+      // 結果画面は表示済み（または表示中）: 演出・記録はそのまま進行させ、切断だけ処理する
+      ONLINE.close();
+      const detail = UI.$('result-detail');
+      if (detail && !detail.textContent.includes('（相手は退出しました）')) {
+        detail.textContent += '（相手は退出しました）';
+      }
+      UI.$('btn-rematch').disabled = true;
+      return;
+    }
+    // ゲーム進行中の切断は投了とみなす
+    recordResult(G.myIndex);
     ONLINE.close();
     G.mode = null;
-    alert(message);
+    alert(message + '（あなたの勝ちとして記録しました）');
     UI.hideResult();
     UI.showScreen('title');
   }
@@ -166,6 +185,8 @@
     G.state = ENGINE.newGame(phases);
     G.taken = [];
     G.myRematch = false; G.theirRematch = false;
+    G.resultRecorded = false;
+    UI.$('btn-rematch').disabled = false;
     UI.clearLog();
     UI.hideResult();
     UI.setEmoteBarVisible(true);

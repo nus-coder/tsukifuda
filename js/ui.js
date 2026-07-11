@@ -82,8 +82,18 @@ const UI = (() => {
       if (opts.pulsePot && state.pot > 0) {
         potEl.classList.remove('pulse'); void potEl.offsetWidth; potEl.classList.add('pulse');
       }
-      const special = MOONS[ph.moon].desc !== '効果なし' ? `【${MOONS[ph.moon].desc}】` : '';
-      if (special) $('round-label').textContent += ` ${special}`;
+      const alertEl = $('phase-alert');
+      alertEl.className = 'phase-alert hidden';
+      if (ph.moon === 'new') {
+        alertEl.textContent = '🌑 新月：パワーの低い方が勝つ！';
+        alertEl.className = 'phase-alert alert-new';
+      } else if (ph.moon === 'eclipse') {
+        alertEl.textContent = '🌘 月蝕：全カードの能力無効！';
+        alertEl.className = 'phase-alert alert-eclipse';
+      } else if (ph.moon === 'full') {
+        alertEl.textContent = '🌕 満月：人狼はパワー+5';
+        alertEl.className = 'phase-alert alert-full';
+      }
     }
 
     // 相手の残り手札（表向き＝公開情報）
