@@ -30,7 +30,7 @@ const UI = (() => {
     return `<div class="power">${c.id}</div>
       <div class="art">${CARD_ART[id]}</div>
       <div class="name">${c.name}</div>
-      <div class="text">${c.text}</div>`;
+      <div class="text">${c.short}</div>`;
   }
   function makeCardEl(id) {
     const el = document.createElement('div');
@@ -273,17 +273,23 @@ const UI = (() => {
   function clearLog() { $('log').innerHTML = ''; }
 
   // ---------- ツールチップ ----------
+  // カード説明は固定位置に表示する（マウス追従だとカードや出し場に被って見づらいため）。
+  // 自分のカード → 手札のすぐ上 / 相手のカード → 相手手札のすぐ下、いずれも中央寄せ。
   function attachTooltip(el, cardId) {
     const tip = $('card-tooltip');
-    el.addEventListener('mouseenter', e => {
+    el.addEventListener('mouseenter', () => {
       const c = CARDS[cardId];
       tip.innerHTML = `<div class="t-name">${c.id}　${c.name}（${c.kana}）</div><div>${c.text}</div><div class="t-flavor">${c.flavor}</div>`;
       tip.classList.remove('hidden');
-    });
-    el.addEventListener('mousemove', e => {
       const w = tip.offsetWidth, h = tip.offsetHeight;
-      tip.style.left = Math.min(e.clientX + 14, window.innerWidth - w - 8) + 'px';
-      tip.style.top = Math.max(e.clientY - h - 12, 6) + 'px';
+      tip.style.left = Math.max(8, (window.innerWidth - w) / 2) + 'px';
+      if (el.closest('.opp-hand')) {
+        const hand = $('opp-hand').getBoundingClientRect();
+        tip.style.top = Math.min(hand.bottom + 8, window.innerHeight - h - 8) + 'px';
+      } else {
+        const hand = $('my-hand').getBoundingClientRect();
+        tip.style.top = Math.max(8, hand.top - h - 22) + 'px';
+      }
     });
     el.addEventListener('mouseleave', () => tip.classList.add('hidden'));
   }

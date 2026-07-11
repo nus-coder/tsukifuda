@@ -241,7 +241,8 @@ body:not([data-screen="game"]) #btn-pause { visibility: hidden; }
 .card-tooltip {
   position: fixed; z-index: 20; pointer-events: none;
   background: var(--panel); border: 1px solid var(--gold); border-radius: 10px;
-  padding: 10px 14px; max-width: 240px; font-size: 12.5px; line-height: 1.6;
+  padding: 10px 16px; max-width: min(420px, 92vw); font-size: 13px; line-height: 1.65;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, .55);
 }
 .card-tooltip .t-name { color: var(--gold); font-weight: 800; }
 .card-tooltip .t-flavor { color: var(--dim); font-style: italic; margin-top: 4px; }
@@ -455,7 +456,8 @@ body:not([data-screen="game"]) #btn-pause { visibility: hidden; }
 
   /* カード類を小型化 */
   .card { width: 88px; height: 128px; }
-  .card .text { font-size: 8.5px; padding: 2px 4px 0; }
+  .card .art { flex: 0 0 46%; }
+  .card .text { font-size: 9.5px; padding: 2px 4px 0; }
   .card .name { font-size: 11px; letter-spacing: 0; }
   .card .power { width: 24px; height: 24px; font-size: 13px; }
   .played-slot { width: 88px; height: 128px; }
