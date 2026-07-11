@@ -184,7 +184,7 @@ const UI = (() => {
       el.classList.remove('play', 'escalate');
       el.classList.add('hidden');
       done();
-    }, reduced ? 300 : 3000);
+    }, reduced ? 300 : 4000);
   }
 
   // ---------- ラウンド公開演出 ----------

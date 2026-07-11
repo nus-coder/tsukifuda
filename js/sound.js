@@ -68,19 +68,19 @@ const SOUND = (() => {
     steal:   () => { noise(0.3, { freq: 3500, gain: 0.07, q: 2 }); tone(300, 0.3, { type: 'sawtooth', gain: 0.05, glide: 120 }); },
     emote:   () => tone(988, 0.1, { type: 'triangle', gain: 0.08, glide: 1319 }),
     start:   () => [392, 523, 659, 784].forEach((f, i) => tone(f, 0.25, { type: 'triangle', when: i * 0.11, gain: 0.09 })),
-    // 入り(0〜0.66s)にライザー、タメ(〜2.76s)は静かに、ホイップ・アウトの瞬間に一撃
+    // 入り(0〜0.66s)にライザー、タメ(〜3.76s)は静かに、ホイップ・アウトの瞬間に一撃
     tension: () => {
       tone(220, 0.66, { type: 'sawtooth', gain: 0.045, glide: 660 });
       tone(55, 0.66, { type: 'sine', gain: 0.09, glide: 82 });
-      noise(0.12, { freq: 150, gain: 0.15, q: 2, when: 2.76 });
-      tone(85, 0.16, { type: 'sine', gain: 0.12, when: 2.76 });
+      noise(0.12, { freq: 150, gain: 0.15, q: 2, when: 3.76 });
+      tone(85, 0.16, { type: 'sine', gain: 0.12, when: 3.76 });
     },
     tensionBig: () => {
       tone(220, 0.66, { type: 'sawtooth', gain: 0.045, glide: 660 });
       tone(440, 0.66, { type: 'sawtooth', gain: 0.02, glide: 1320 });
       tone(55, 0.66, { type: 'sine', gain: 0.09, glide: 82 });
-      noise(0.12, { freq: 150, gain: 0.15, q: 2, when: 2.76 });
-      tone(85, 0.16, { type: 'sine', gain: 0.12, when: 2.76 });
+      noise(0.12, { freq: 150, gain: 0.15, q: 2, when: 3.76 });
+      tone(85, 0.16, { type: 'sine', gain: 0.12, when: 3.76 });
     },
   };
 
