@@ -411,32 +411,34 @@ body:not([data-screen="game"]) #btn-pause { visibility: hidden; }
   text-shadow: 0 0 6px var(--accent), 0 0 20px var(--gold);
   transform: scale(1.4); opacity: 0; white-space: nowrap;
 }
-.cutin.play .cutin-dim { animation: cutinDim .84s linear; }
-.cutin.play .cutin-banner { animation: cutinBanner .84s both; }
-.cutin.play .cutin-banner::before { animation: cutinLines .84s linear; }
-.cutin.play .cutin-stake { animation: cutinStake .84s both; }
+.cutin.play .cutin-dim { animation: cutinDim 3s linear; }
+.cutin.play .cutin-banner { animation: cutinBanner 3s both; }
+.cutin.play .cutin-banner::before { animation: cutinLines 3s linear; }
+.cutin.play .cutin-stake { animation: cutinStake 3s both; }
 .cutin.play.escalate .cutin-banner { border-color: var(--accent); }
-.cutin.play.escalate .cutin-stake { animation: cutinStake .84s both, cutinGlowPulse .84s both; }
+.cutin.play.escalate .cutin-stake { animation: cutinStake 3s both, cutinGlowPulse 3s both; }
 
-@keyframes cutinDim { 0% { opacity: 0; } 12% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
-@keyframes cutinLines { from { background-position: 0 0; } to { background-position: -60px 0; } }
+/* スラム・イン（〜210ms）とホイップ・アウト（2760ms〜）は速いまま、
+   間の「タメ」だけを約2.5秒に伸ばして視認しやすくする */
+@keyframes cutinDim { 0% { opacity: 0; } 5% { opacity: 1; } 92% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes cutinLines { from { background-position: 0 0; } to { background-position: -200px 0; } }
 @keyframes cutinBanner {
-  0%, 7%    { transform: translateX(115%) rotate(-6deg); animation-timing-function: cubic-bezier(.1,.9,.15,1.15); }
-  26%       { transform: translateX(0) rotate(-6deg); animation-timing-function: linear; }
-  78%       { transform: translateX(-1.2%) rotate(-6deg); animation-timing-function: cubic-bezier(.7,0,1,.5); }
-  94%, 100% { transform: translateX(-130%) rotate(-6deg); }
+  0%, 2%    { transform: translateX(115%) rotate(-6deg); animation-timing-function: cubic-bezier(.1,.9,.15,1.15); }
+  7%        { transform: translateX(0) rotate(-6deg); animation-timing-function: linear; }
+  92%       { transform: translateX(-1.2%) rotate(-6deg); animation-timing-function: cubic-bezier(.7,0,1,.5); }
+  98%, 100% { transform: translateX(-130%) rotate(-6deg); }
 }
 @keyframes cutinStake {
-  0%, 24% { transform: scale(1.4); opacity: 0; }
-  26%     { opacity: 1; }
-  38%     { transform: scale(1); animation-timing-function: cubic-bezier(.34,1.56,.64,1); }
-  100%    { transform: scale(1); }
+  0%, 7% { transform: scale(1.4); opacity: 0; }
+  8%     { opacity: 1; }
+  11%    { transform: scale(1); animation-timing-function: cubic-bezier(.34,1.56,.64,1); }
+  100%   { transform: scale(1); }
 }
 @keyframes cutinGlowPulse {
-  0%, 24%   { text-shadow: 0 0 6px var(--accent), 0 0 20px var(--gold); }
-  40%       { text-shadow: 0 0 14px var(--accent), 0 0 34px var(--gold); }
-  55%       { text-shadow: 0 0 6px var(--accent), 0 0 20px var(--gold); }
-  70%       { text-shadow: 0 0 14px var(--accent), 0 0 34px var(--gold); }
+  0%, 8%    { text-shadow: 0 0 6px var(--accent), 0 0 20px var(--gold); }
+  30%       { text-shadow: 0 0 14px var(--accent), 0 0 34px var(--gold); }
+  45%       { text-shadow: 0 0 6px var(--accent), 0 0 20px var(--gold); }
+  65%       { text-shadow: 0 0 14px var(--accent), 0 0 34px var(--gold); }
   85%, 100% { text-shadow: 0 0 6px var(--accent), 0 0 20px var(--gold); }
 }
 @media (prefers-reduced-motion: reduce) {
