@@ -1,0 +1,10 @@
+{
+  "name": "tsukifuda-brick-tools",
+  "private": true,
+  "version": "1.0.0",
+  "description": "TRIMUI Brick 移植用アセット生成ツール（mac側ビルド時のみ使用）",
+  "type": "module",
+  "dependencies": {
+    "@resvg/resvg-js": "^2.6.2"
+  }
+}
