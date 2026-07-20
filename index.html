@@ -52,6 +52,21 @@
   <div class="shooting-star" style="--delay:9s; --top:30%"></div>
 </section>
 
+<!-- 制限時間選択（対戦形式を決めた直後、ゲーム開始前に表示） -->
+<section id="screen-timelimit" class="screen">
+  <div class="lobby-panel">
+    <h2>制限時間を選ぶ</h2>
+    <p class="story-lead">カード選択の持ち時間を決めてください。</p>
+    <div class="timelimit-options" id="timelimit-options">
+      <button class="btn" data-tl="10">10秒</button>
+      <button class="btn" data-tl="20">20秒</button>
+      <button class="btn" data-tl="40">40秒</button>
+      <button class="btn" data-tl="0">なし</button>
+    </div>
+    <button class="btn btn-sub" data-action="timelimit-back">戻る</button>
+  </div>
+</section>
+
 <!-- ルール画面（ページ式チュートリアル） -->
 <section id="screen-rules" class="screen">
   <div class="rules-panel">
@@ -129,6 +144,7 @@
       <div class="action-bar">
         <button class="btn btn-confirm hidden" id="btn-confirm">このカードで勝負！</button>
         <span id="turn-hint" class="turn-hint"></span>
+        <span id="turn-timer" class="turn-timer"></span>
       </div>
     </div>
   </div>
@@ -171,6 +187,7 @@
       <button class="btn" id="btn-pause-rules">ルールを見る</button>
       <button class="btn" id="btn-pause-sound">効果音</button>
       <button class="btn" id="btn-pause-bgm">BGM</button>
+      <button class="btn" id="btn-pause-timelimit">制限時間：20秒</button>
       <button class="btn btn-sub" id="btn-forfeit">投了する</button>
     </div>
   </div>

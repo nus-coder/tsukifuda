@@ -339,6 +339,16 @@ void draw_card(int x, int y, int w, int h, int id, unsigned flags)
         fill_rect(x, y, w, h, C_DARK, 140);
 }
 
+// 相手が選択済みであることを示す裏向きカード（絵柄は伏せたまま）
+void draw_card_back(int x, int y, int w, int h)
+{
+    fill_rect(x, y, w, h, C_PANEL, 235);
+    draw_frame(x, y, w, h, C_GOLD);
+    draw_frame(x - 1, y - 1, w + 2, h + 2, C_GOLD);
+    draw_moon_icon(x + w / 2, y + h / 2 - 6, w / 5, MOON_FULL);
+    draw_text(x + w / 2, y + h - 24, 14, C_DIM, ALIGN_CENTER, "選択済み");
+}
+
 // ---------- 初期化 ----------
 
 bool render_init(SDL_Renderer *ren, const char *res_dir)

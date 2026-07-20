@@ -134,6 +134,20 @@ const UI = (() => {
   function setHint(text) { $('turn-hint').textContent = text; }
   function setConfirmVisible(v) { $('btn-confirm').classList.toggle('hidden', !v); }
 
+  // 相手がカードを選択済み（未公開）であることを示す裏向きカード
+  function setOppPicked(shown) {
+    const slot = $('slot-opp');
+    slot.innerHTML = '';
+    if (shown) slot.appendChild(Object.assign(document.createElement('div'), { className: 'card back' }));
+  }
+
+  // 制限時間の残り表示
+  function setTimerText(text, urgent = false) {
+    const el = $('turn-timer');
+    el.textContent = text;
+    el.classList.toggle('urgent', urgent);
+  }
+
   // ---------- 演出ヘルパー ----------
   function floatText(anchorEl, text, cls = '') {
     const r = anchorEl.getBoundingClientRect();
@@ -495,6 +509,7 @@ const UI = (() => {
 
   return {
     showScreen, renderGame, markSelected, setHint, setConfirmVisible,
+    setOppPicked, setTimerText,
     revealRound, log, clearLog, showResult, hideResult, renderRules, $,
     phaseAmbience, renderEmoteBar, setEmoteBarVisible, showEmote, renderTitleStats,
     setRulesBackLabel, renderStory, showDialogue, decorateStoryResult, floatText,

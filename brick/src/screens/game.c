@@ -30,6 +30,8 @@ static int g_pause_cursor;
 static bool g_forfeit_confirm;
 
 static Uint32 g_timer;        // フェーズ用タイマー（now基準の締切）
+static bool g_choose_has_limit; // 今ラウンドのカード選択に制限時間があるか
+static Uint32 g_pause_t0;     // 中断メニューを開いた時刻（締切のズラし補正用）
 static Uint32 g_reveal_t0;
 static int g_reveal_stage;
 static bool g_cutin_big;
@@ -90,13 +92,15 @@ static void describe_round(const RoundResult *r, char *buf, size_t cap)
 
 static void enter_choose(App *a)
 {
-    (void)a;
     g_phase = GP_CHOOSE;
     g_selected = -1;
     g_cursor = 0;
     g_focus_track = false;
     g_detail = false;
     g_have_res = false;
+    int tl = save_data()->time_limit;
+    g_choose_has_limit = tl > 0;
+    if (g_choose_has_limit) g_timer = a->now + (Uint32)tl * 1000;  // 制限時間制：ここから持ち時間を消費
     // 月齢演出（webの phaseAmbience 相当）
     if (!g_st.finished && g_st.phases[g_st.round].moon == MOON_ECLIPSE)
         audio_play("eclipse");
@@ -249,11 +253,12 @@ static void forfeit(App *a)
 
 static void pause_input(App *a)
 {
-    const int PAUSE_N = 5;
+    const int PAUSE_N = 6;
     if (input_pressed(BTN_UP)) { g_pause_cursor = (g_pause_cursor + PAUSE_N - 1) % PAUSE_N; g_forfeit_confirm = false; audio_play("select"); }
     if (input_pressed(BTN_DOWN)) { g_pause_cursor = (g_pause_cursor + 1) % PAUSE_N; g_forfeit_confirm = false; audio_play("select"); }
     if (input_pressed(BTN_B) || input_pressed(BTN_START)) {
         g_paused = false;
+        g_timer += a->now - g_pause_t0;  // 中断していた分だけ締切を後ろへズラす
         audio_play("click");
         return;
     }
@@ -261,7 +266,7 @@ static void pause_input(App *a)
     audio_play("click");
     SaveData *sv = save_data();
     switch (g_pause_cursor) {
-    case 0: g_paused = false; break;
+    case 0: g_paused = false; g_timer += a->now - g_pause_t0; break;
     case 1:
         g_paused = false;
         a->rules_return = SCR_GAME;
@@ -278,7 +283,14 @@ static void pause_input(App *a)
         sv->bgm = audio_bgm_on();
         save_commit();
         break;
-    case 4:
+    case 4: {
+        int i = 0;
+        while (i < TIME_LIMIT_N && TIME_LIMIT_OPTIONS[i] != sv->time_limit) i++;
+        sv->time_limit = TIME_LIMIT_OPTIONS[(i + 1) % TIME_LIMIT_N];
+        save_commit();
+        break;
+    }
+    case 5:
         if (!g_forfeit_confirm) { g_forfeit_confirm = true; break; }
         forfeit(a);
         break;
@@ -298,6 +310,7 @@ static void choose_input(App *a)
     }
     if (input_pressed(BTN_START)) {
         g_paused = true;
+        g_pause_t0 = a->now;
         g_pause_cursor = 0;
         g_forfeit_confirm = false;
         audio_play("click");
@@ -472,6 +485,9 @@ static void draw_center(App *a)
         if (g_selected >= 0 && (g_phase == GP_CHOOSE || g_phase == GP_AI_WAIT || g_phase == GP_CUTIN))
             draw_card(mx, sy, slot_w, slot_h, g_selected,
                       g_phase == GP_CHOOSE ? CARD_SELECTED : 0);
+        // 相手がカードを選択したことがわかるよう、待機中は裏向きカードを表示
+        if (g_phase == GP_AI_WAIT || g_phase == GP_CUTIN)
+            draw_card_back(ox, sy, slot_w, slot_h);
     }
     draw_text((ox + mx + slot_w) / 2, sy + slot_h / 2 - 18, 30, C_DIM, ALIGN_CENTER, "対");
 
@@ -546,6 +562,16 @@ static void draw_status_rows(App *a)
     }
     draw_text(SCREEN_W / 2, 500, 19, C_TEXT, ALIGN_CENTER, hint);
 
+    // 制限時間制：残り時間表示（選択フェーズのみ、中断中は止めて表示）
+    if (g_phase == GP_CHOOSE && !g_paused && g_choose_has_limit) {
+        Uint32 remain_ms = a->now < g_timer ? g_timer - a->now : 0;
+        int remain_s = (int)(remain_ms + 999) / 1000;
+        char t[16];
+        snprintf(t, sizeof t, "残り %d秒", remain_s);
+        SDL_Color tc = remain_s <= 5 ? C_RED : C_DIM;
+        draw_text(SCREEN_W / 2, 524, 16, tc, ALIGN_CENTER, t);
+    }
+
     // 操作ガイド
     if (g_phase == GP_CHOOSE)
         draw_text(SCREEN_W - 14, 584, 14, C_DIM, ALIGN_RIGHT,
@@ -587,24 +613,27 @@ static void draw_cutin(App *a)
 static void draw_pause(void)
 {
     fill_rect(0, 0, SCREEN_W, SCREEN_H, C_DARK, 190);
-    int w = 420, h = 380;
+    int w = 420, h = 430;
     int x = (SCREEN_W - w) / 2, y = (SCREEN_H - h) / 2;
     panel(x, y, w, h, 250);
     draw_text(x + w / 2, y + 22, 26, C_TEXT, ALIGN_CENTER, "中断メニュー");
-    char items[5][64];
+    int tl = save_data()->time_limit;
+    char items[6][64];
     snprintf(items[0], sizeof items[0], "対戦に戻る");
     snprintf(items[1], sizeof items[1], "ルールを見る");
     snprintf(items[2], sizeof items[2], "効果音：%s", audio_muted() ? "OFF" : "ON");
     snprintf(items[3], sizeof items[3], "BGM：%s", audio_bgm_on() ? "ON" : "OFF");
-    snprintf(items[4], sizeof items[4], "%s", g_forfeit_confirm ? "本当に投了する？" : "投了する");
-    for (int i = 0; i < 5; i++) {
+    if (tl > 0) snprintf(items[4], sizeof items[4], "制限時間：%d秒", tl);
+    else snprintf(items[4], sizeof items[4], "制限時間：なし");
+    snprintf(items[5], sizeof items[5], "%s", g_forfeit_confirm ? "本当に投了する？" : "投了する");
+    for (int i = 0; i < 6; i++) {
         int iy = y + 80 + i * 52;
         bool cur = i == g_pause_cursor;
         if (cur) {
             fill_rect(x + 30, iy - 6, w - 60, 40, C_PANEL, 255);
             draw_frame(x + 30, iy - 6, w - 60, 40, C_GOLD);
         }
-        SDL_Color c = i == 4 && g_forfeit_confirm ? C_RED : (cur ? C_GOLD : C_TEXT);
+        SDL_Color c = i == 5 && g_forfeit_confirm ? C_RED : (cur ? C_GOLD : C_TEXT);
         draw_text(x + w / 2, iy, 20, c, ALIGN_CENTER, items[i]);
     }
 }
@@ -670,11 +699,18 @@ void game_frame(App *a)
                 confirm_pick(a);
             } else {
                 choose_input(a);
+                // 制限時間制：時間切れなら選択中/カーソル上のカードで自動決定
+                if (!g_paused && g_choose_has_limit && a->now >= g_timer) {
+                    if (g_selected < 0) g_selected = g_st.hands[0][g_cursor];
+                    g_detail = false;
+                    audio_play("select");
+                    confirm_pick(a);
+                }
             }
             break;
         case GP_AI_WAIT:
             if (!a->autoplay && input_pressed(BTN_START)) {
-                g_paused = true; g_pause_cursor = 0; g_forfeit_confirm = false;
+                g_paused = true; g_pause_t0 = a->now; g_pause_cursor = 0; g_forfeit_confirm = false;
             }
             if (a->now >= g_timer) resolve_now(a);
             break;

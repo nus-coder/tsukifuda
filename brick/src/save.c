@@ -11,6 +11,8 @@
 static char g_path[1024];
 static SaveData g_data;
 
+const int TIME_LIMIT_OPTIONS[TIME_LIMIT_N] = { 10, 20, 40, 0 };
+
 static void mkdir_p(const char *dir)
 {
     if (mkdir(dir, 0755) != 0 && errno != EEXIST)
@@ -58,6 +60,7 @@ static void load(void)
 {
     memset(&g_data, 0, sizeof g_data);
     g_data.bgm = true; // 既定ON（web版と同じ）
+    g_data.time_limit = 20; // 既定20秒（web版と同じ）
 
     FILE *f = fopen(g_path, "rb");
     if (!f) return;
@@ -70,6 +73,7 @@ static void load(void)
     if (scan_int(buf, "story", &v)) g_data.story = v;
     if (scan_int(buf, "muted", &v)) g_data.muted = v != 0;
     if (scan_int(buf, "bgm", &v)) g_data.bgm = v != 0;
+    if (scan_int(buf, "timeLimit", &v) && (v == 0 || v == 10 || v == 20 || v == 40)) g_data.time_limit = v;
     scan_stats(buf, "novice", &g_data.novice);
     scan_stats(buf, "hard", &g_data.hard);
     if (g_data.story < 0) g_data.story = 0;
@@ -106,12 +110,13 @@ void save_commit(void)
         "\"stats\":{"
         "\"novice\":{\"w\":%d,\"l\":%d,\"d\":%d},"
         "\"hard\":{\"w\":%d,\"l\":%d,\"d\":%d}},"
-        "\"muted\":%s,\"bgm\":%s}\n",
+        "\"muted\":%s,\"bgm\":%s,\"timeLimit\":%d}\n",
         g_data.story,
         g_data.novice.w, g_data.novice.l, g_data.novice.d,
         g_data.hard.w, g_data.hard.l, g_data.hard.d,
         g_data.muted ? "true" : "false",
-        g_data.bgm ? "true" : "false");
+        g_data.bgm ? "true" : "false",
+        g_data.time_limit);
     fclose(f);
     if (rename(tmp, g_path) != 0)
         fprintf(stderr, "[save] rename failed: %s\n", strerror(errno));

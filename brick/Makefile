@@ -14,7 +14,7 @@ QJS_DIR := vendor/quickjs
 QJS_SRCS := $(QJS_DIR)/quickjs.c $(QJS_DIR)/libregexp.c $(QJS_DIR)/libunicode.c $(QJS_DIR)/dtoa.c
 APP_SRCS := src/main.c src/jsbridge.c src/render.c src/input.c src/audio.c src/save.c \
             src/screens/title.c src/screens/rules.c src/screens/story.c \
-            src/screens/dialogue.c src/screens/game.c
+            src/screens/dialogue.c src/screens/timelimit.c src/screens/game.c
 
 WARN := -Wall -Wextra
 CSTD := -std=c99

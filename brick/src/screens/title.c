@@ -38,12 +38,16 @@ static void start_cpu(App *a, const char *level)
     a->screen = SCR_GAME;
 }
 
+// 制限時間選択画面からの確定コールバック（対戦形式を決めた直後に挟む）
+static void confirm_cpu_novice(App *a) { start_cpu(a, "novice"); }
+static void confirm_cpu_hard(App *a) { start_cpu(a, "hard"); }
+
 static void activate(App *a, int idx)
 {
     audio_play("click");
     switch (idx) {
-    case 0: start_cpu(a, "novice"); break;
-    case 1: start_cpu(a, "hard"); break;
+    case 0: timelimit_enter(a, confirm_cpu_novice, SCR_TITLE); a->screen = SCR_TIMELIMIT; break;
+    case 1: timelimit_enter(a, confirm_cpu_hard, SCR_TITLE); a->screen = SCR_TIMELIMIT; break;
     case 2: story_enter(a); a->screen = SCR_STORY; break;
     case 3:
         a->rules_return = SCR_TITLE;
@@ -122,6 +126,7 @@ void title_frame(App *a)
     if (input_pressed(BTN_A) || input_pressed(BTN_START)) activate(a, g_cursor);
     bool want_shot = input_pressed(BTN_SELECT) && a->shot_dir[0];
 
+    if (a->screen != SCR_TITLE) return;
     render(a);
     if (want_shot) app_screenshot(a, "title");
 }

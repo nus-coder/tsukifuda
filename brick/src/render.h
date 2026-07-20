@@ -48,5 +48,6 @@ void draw_moon_icon(int cx, int cy, int r, Moon m);
 // カード描画（枠+絵+パワー+名前+短文）。w>=110 で短文も描く
 void draw_card(int x, int y, int w, int h, int id, unsigned flags);
 void draw_card_art(int x, int y, int w, int h, int id);          // 絵のみ（会話ポートレート等）
+void draw_card_back(int x, int y, int w, int h);                 // 裏向き（相手が選択済み）
 
 #endif

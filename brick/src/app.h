@@ -13,6 +13,7 @@ typedef enum {
     SCR_RULES,
     SCR_STORY,
     SCR_DIALOGUE,
+    SCR_TIMELIMIT,
     SCR_GAME,
 } ScreenId;
 
@@ -56,6 +57,10 @@ void story_enter(App *a);
 void story_frame(App *a);
 void dialogue_enter(App *a, int boss_index); // intro再生→ゲーム開始
 void dialogue_frame(App *a);
+// 対戦形式・対戦キャラクターを決めた直後、ゲーム開始前に挟む制限時間選択画面。
+// 決定で on_confirm(a) を呼ぶ（画面遷移はコールバック側の責任）。Bで cancel_screen へ戻る。
+void timelimit_enter(App *a, void (*on_confirm)(App *a), ScreenId cancel_screen);
+void timelimit_frame(App *a);
 void game_enter(App *a);      // mode/level/boss_index を設定済みで呼ぶ
 void game_frame(App *a);
 

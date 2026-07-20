@@ -10,6 +10,13 @@
 
 static int g_cursor;
 static int g_auto_frames;
+static int g_pending_boss;
+
+static void confirm_boss_pick(App *a)
+{
+    dialogue_enter(a, g_pending_boss);
+    a->screen = SCR_DIALOGUE;
+}
 
 void story_enter(App *a)
 {
@@ -93,8 +100,9 @@ void story_frame(App *a)
     if (input_pressed(BTN_DOWN)) { g_cursor = (g_cursor + 1) % n; audio_play("select"); }
     if (input_pressed(BTN_A) && g_cursor <= prog) {
         audio_play("click");
-        dialogue_enter(a, g_cursor);
-        a->screen = SCR_DIALOGUE;
+        g_pending_boss = g_cursor;
+        timelimit_enter(a, confirm_boss_pick, SCR_STORY);
+        a->screen = SCR_TIMELIMIT;
         return;
     }
     if (input_pressed(BTN_B)) {

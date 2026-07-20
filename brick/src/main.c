@@ -134,6 +134,7 @@ int main(int argc, char **argv)
         case SCR_RULES: rules_frame(&app); break;
         case SCR_STORY: story_frame(&app); break;
         case SCR_DIALOGUE: dialogue_frame(&app); break;
+        case SCR_TIMELIMIT: timelimit_frame(&app); break;
         case SCR_GAME: game_frame(&app); break;
         }
 

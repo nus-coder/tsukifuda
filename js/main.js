@@ -20,7 +20,104 @@
     myRematch: false,
     theirRematch: false,
     resultRecorded: false, // 結果の二重記録防止
+    // 制限時間制
+    choiceDeadline: null,  // カード選択の締切(Date.now()基準)
+    choicePausedAt: null,  // 中断メニューを開いた時刻
   };
+
+  // ---------- 制限時間制 ----------
+  const TIME_LIMIT_KEY = 'tsukifuda-timelimit';
+  const TIME_LIMIT_OPTIONS = [10, 20, 40, 0]; // 秒。0=なし
+  function loadTimeLimit() {
+    const raw = localStorage.getItem(TIME_LIMIT_KEY);
+    if (raw == null) return 20;
+    const v = Number(raw);
+    return TIME_LIMIT_OPTIONS.includes(v) ? v : 20;
+  }
+  let choiceTimeLimitS = loadTimeLimit();
+  let choiceTimerHandle = null;
+
+  function timeLimitLabel() { return choiceTimeLimitS > 0 ? `制限時間：${choiceTimeLimitS}秒` : '制限時間：なし'; }
+  function syncTimeLimitBtns() {
+    UI.$('btn-pause-timelimit').textContent = timeLimitLabel();
+  }
+  function cycleTimeLimit() {
+    const i = TIME_LIMIT_OPTIONS.indexOf(choiceTimeLimitS);
+    choiceTimeLimitS = TIME_LIMIT_OPTIONS[(i + 1) % TIME_LIMIT_OPTIONS.length];
+    localStorage.setItem(TIME_LIMIT_KEY, String(choiceTimeLimitS));
+    syncTimeLimitBtns();
+  }
+
+  // ---------- 制限時間選択画面（対戦形式を決めた直後、ゲーム開始前に表示） ----------
+  let pendingTimeLimitCallback = null;
+  let pendingTimeLimitCancelScreen = 'title';
+  function showTimeLimitPicker(onDone, cancelScreen = 'title') {
+    pendingTimeLimitCallback = onDone;
+    pendingTimeLimitCancelScreen = cancelScreen;
+    document.querySelectorAll('#timelimit-options .btn').forEach(b => {
+      b.classList.toggle('selected', Number(b.dataset.tl) === choiceTimeLimitS);
+    });
+    UI.showScreen('timelimit');
+  }
+  document.querySelectorAll('#timelimit-options .btn').forEach(b => {
+    b.addEventListener('click', () => {
+      choiceTimeLimitS = Number(b.dataset.tl);
+      localStorage.setItem(TIME_LIMIT_KEY, String(choiceTimeLimitS));
+      syncTimeLimitBtns();
+      SOUND.play('click');
+      const cb = pendingTimeLimitCallback;
+      pendingTimeLimitCallback = null;
+      if (cb) cb();
+    });
+  });
+
+  function stopChoiceTimer() {
+    if (choiceTimerHandle) { clearInterval(choiceTimerHandle); choiceTimerHandle = null; }
+    G.choiceDeadline = null;
+    G.choicePausedAt = null;
+    UI.setTimerText('');
+  }
+
+  function tickChoiceTimer() {
+    if (!G.choiceDeadline || G.choicePausedAt) return;
+    const remainMs = G.choiceDeadline - Date.now();
+    const remainS = Math.max(0, Math.ceil(remainMs / 1000));
+    UI.setTimerText(`残り ${remainS}秒`, remainS <= 5);
+    if (remainMs <= 0) {
+      stopChoiceTimer();
+      autoConfirmChoice();
+    }
+  }
+
+  function startChoiceTimer() {
+    stopChoiceTimer();
+    if (choiceTimeLimitS <= 0) return; // 制限時間なし
+    G.choiceDeadline = Date.now() + choiceTimeLimitS * 1000;
+    choiceTimerHandle = setInterval(tickChoiceTimer, 250);
+    tickChoiceTimer();
+  }
+
+  function pauseChoiceTimer() {
+    if (!G.choiceDeadline || G.choicePausedAt) return;
+    G.choicePausedAt = Date.now();
+  }
+
+  function resumeChoiceTimer() {
+    if (!G.choiceDeadline || !G.choicePausedAt) return;
+    G.choiceDeadline += Date.now() - G.choicePausedAt;
+    G.choicePausedAt = null;
+  }
+
+  // 時間切れ：未選択なら手札の先頭を自動選択して決定する
+  function autoConfirmChoice() {
+    if (G.selected == null) {
+      const me = G.state.players[G.myIndex];
+      if (!me || me.hand.length === 0) return;
+      G.selected = [...me.hand].sort((a, b) => a - b)[0];
+    }
+    if (G.mode === 'cpu' || G.mode === 'story') confirmCpu();
+    else if (G.mode === 'online') confirmOnline().catch(console.error);
+  }
 
   // ---------- 戦績 (localStorage) ----------
   const STATS_KEY = 'tsukifuda-stats';
@@ -55,6 +152,7 @@
         SOUND.play('select');
       },
     });
+    startChoiceTimer();
     UI.phaseAmbience(G.state.phases[G.state.round]);
   }
 
@@ -100,7 +198,10 @@
     UI.hideResult();
     UI.renderStory(i => {
       SOUND.play('click');
-      UI.showDialogue(STORY.BOSSES[i], STORY.BOSSES[i].intro, () => startStoryGame(i));
+      showTimeLimitPicker(() => {
+        UI.showScreen('story');
+        UI.showDialogue(STORY.BOSSES[i], STORY.BOSSES[i].intro, () => startStoryGame(i));
+      }, 'story');
     });
     UI.showScreen('story');
   }
@@ -124,9 +225,11 @@
 
   function confirmCpu() {
     if (G.selected == null) return;
+    stopChoiceTimer();
     const myPick = G.selected;
     UI.setConfirmVisible(false);
     UI.renderGame(view(), { locked: true, hint: '相手が考えています…', keepSlots: true });
+    UI.setOppPicked(true); // 相手（CPU）がカードを選択したことを示す
     setTimeout(() => {
       const aiPick = AI.pick(G.state, G.level);
       const { state, result } = ENGINE.resolveRound(G.state, [myPick, aiPick]);
@@ -170,6 +273,7 @@
       return;
     }
     // ゲーム進行中の切断は投了とみなす
+    stopChoiceTimer();
     recordResult(G.myIndex);
     ONLINE.close();
     G.mode = null;
@@ -197,9 +301,11 @@
 
   async function confirmOnline() {
     if (G.selected == null || G.pending) return;
+    stopChoiceTimer();
     UI.setConfirmVisible(false);
     G.pending = await ONLINE.makeCommit(G.state.round, G.selected);
     UI.renderGame(view(), { locked: true, hint: '相手の決定を待っています…' });
+    UI.setOppPicked(!!G.theirCommit); // 相手が先に選択済みなら復元
     maybeReveal();
   }
 
@@ -229,6 +335,7 @@
       case 'commit':
         if (msg.round !== G.state?.round) return;
         G.theirCommit = String(msg.hash);
+        UI.setOppPicked(true); // 相手がカードを選択（コミット）したことを示す
         maybeReveal();
         break;
       case 'reveal': {
@@ -272,21 +379,24 @@
     UI.$('join-code').value = '';
 
     UI.$('btn-host').onclick = () => {
-      UI.$('btn-host').disabled = true;
-      lobbyStatus('部屋を準備しています…');
-      ONLINE.host({
-        ...netHandlers,
-        onReady: code => {
-          UI.$('room-code').textContent = code;
-          UI.$('host-info').classList.remove('hidden');
-          lobbyStatus('');
-        },
-        onConnected: () => {
-          const phases = ENGINE.shufflePhases();
-          ONLINE.send({ t: 'setup', phases });
-          startOnlineGame(phases, true);
-        },
-      });
+      showTimeLimitPicker(() => {
+        UI.showScreen('lobby');
+        UI.$('btn-host').disabled = true;
+        lobbyStatus('部屋を準備しています…');
+        ONLINE.host({
+          ...netHandlers,
+          onReady: code => {
+            UI.$('room-code').textContent = code;
+            UI.$('host-info').classList.remove('hidden');
+            lobbyStatus('');
+          },
+          onConnected: () => {
+            const phases = ENGINE.shufflePhases();
+            ONLINE.send({ t: 'setup', phases });
+            startOnlineGame(phases, true);
+          },
+        });
+      }, 'lobby');
     };
 
     UI.$('btn-join').onclick = () => {
@@ -305,10 +415,14 @@
     const action = e.target.closest('[data-action]')?.dataset.action;
     if (!action) return;
     switch (action) {
-      case 'cpu-novice': startCpuGame('novice'); break;
-      case 'cpu-hard': startCpuGame('hard'); break;
+      case 'cpu-novice': showTimeLimitPicker(() => startCpuGame('novice')); break;
+      case 'cpu-hard': showTimeLimitPicker(() => startCpuGame('hard')); break;
       case 'story': showStoryScreen(); break;
       case 'online': setupLobby(); UI.showScreen('lobby'); break;
+      case 'timelimit-back':
+        pendingTimeLimitCallback = null;
+        UI.showScreen(pendingTimeLimitCancelScreen);
+        break;
       case 'rules':
         G.rulesReturn = 'title';
         UI.setRulesBackLabel('タイトルへ戻る');
@@ -316,10 +430,11 @@
         UI.showScreen('rules');
         break;
       case 'rules-back':
-        if (G.rulesReturn === 'game') UI.showScreen('game');
+        if (G.rulesReturn === 'game') { UI.showScreen('game'); resumeChoiceTimer(); }
         else { UI.renderTitleStats(loadStats()); UI.showScreen('title'); }
         break;
       case 'back-title':
+        stopChoiceTimer();
         if (G.mode === 'online') { ONLINE.close(); G.mode = null; }
         UI.hideResult();
         UI.$('btn-host').disabled = false;
@@ -386,10 +501,12 @@
     resetForfeit();
     syncPauseSound();
     UI.$('pause-overlay').classList.remove('hidden');
+    pauseChoiceTimer();
     SOUND.play('click');
   });
   UI.$('btn-resume').addEventListener('click', () => {
     UI.$('pause-overlay').classList.add('hidden');
+    resumeChoiceTimer();
     SOUND.play('click');
   });
   UI.$('btn-pause-rules').addEventListener('click', () => {
@@ -412,6 +529,10 @@
     syncMusicBtn();
     SOUND.play('click');
   });
+  UI.$('btn-pause-timelimit').addEventListener('click', () => {
+    cycleTimeLimit();
+    SOUND.play('click');
+  });
   forfeitBtn.addEventListener('click', () => {
     if (!forfeitBtn.classList.contains('confirm')) {
       forfeitBtn.textContent = '本当に投了する？';
@@ -422,6 +543,7 @@
     const mode = G.mode;
     UI.$('pause-overlay').classList.add('hidden');
     resetForfeit();
+    stopChoiceTimer();
     if (mode === 'online') {
       recordResult(1 - G.myIndex); // 投了は負け扱い
       ONLINE.close();
@@ -438,6 +560,7 @@
 
   // 初期表示
   UI.renderTitleStats(loadStats());
+  syncTimeLimitBtns();
   FX.setAmbient(true); // 初期表示はタイトルなので蛍を飛ばす
 
   UI.$('btn-story-back').addEventListener('click', () => {

@@ -156,6 +156,12 @@ body:not([data-screen="game"]) #btn-pause { visibility: hidden; }
   padding: 30px 34px; width: min(720px, 92vw); max-height: 88vh; overflow: auto;
 }
 .rules-panel h2, .lobby-panel h2 { color: var(--moon); margin-bottom: 16px; letter-spacing: .15em; }
+
+.timelimit-options { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 20px; }
+.timelimit-options .btn.selected {
+  border-color: var(--gold); box-shadow: 0 0 14px rgba(232, 201, 62, .4);
+  background: linear-gradient(160deg, #4a4270, #362f58);
+}
 #rules-body h3 { color: var(--gold); margin: 18px 0 6px; font-size: 15px; }
 #rules-body p, #rules-body li { font-size: 14px; line-height: 1.8; color: var(--ink); }
 #rules-body ul { padding-left: 20px; }
@@ -292,6 +298,8 @@ body:not([data-screen="game"]) #btn-pause { visibility: hidden; }
 .my-hand .card.disabled { pointer-events: none; filter: grayscale(.6) brightness(.6); }
 .action-bar { display: flex; align-items: center; gap: 16px; padding: 6px; min-height: 52px; }
 .turn-hint { color: var(--dim); font-size: 14px; }
+.turn-timer { color: var(--dim); font-size: 14px; font-weight: 700; margin-left: auto; }
+.turn-timer.urgent { color: var(--accent); animation: alertPulse 1s ease-in-out infinite; }
 
 /* 公開演出 */
 @keyframes flipIn {
