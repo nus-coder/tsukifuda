@@ -424,6 +424,104 @@
     };
   }
 
+  // ---------- 近くの人と対戦（サーバーレス手動シグナリング）----------
+  function nearbyStatus(text, isError = false) {
+    const el = UI.$('nearby-status');
+    el.textContent = text;
+    el.classList.toggle('error', isError);
+  }
+
+  function copyToClipboard(text, btn) {
+    if (!text) return;
+    const label = btn.textContent;
+    navigator.clipboard?.writeText(text).then(() => {
+      btn.textContent = 'コピーしました';
+      setTimeout(() => { btn.textContent = label; }, 1200);
+    }).catch(() => nearbyStatus('コピーできませんでした。長押しで選択してコピーしてください。', true));
+  }
+
+  function setupNearby() {
+    const $ = UI.$;
+    $('nearby-roles').classList.remove('hidden');
+    $('nearby-host').classList.add('hidden');
+    $('nearby-guest').classList.add('hidden');
+    $('nearby-offer').value = '';
+    $('nearby-answer-in').value = '';
+    $('nearby-offer-in').value = '';
+    $('nearby-answer').value = '';
+    nearbyStatus('');
+
+    // 握手中のエラーはロビーではなくこの画面に出す
+    const nearbyHandlers = {
+      onMessage: netHandlers.onMessage,
+      onDisconnect: netHandlers.onDisconnect,
+      onError: e => {
+        console.error(e);
+        nearbyStatus('接続を確立できませんでした。回線の組み合わせによっては繋がらないことがあります（同じWi‑Fiなら高確率で繋がります）。', true);
+      },
+    };
+
+    $('nearby-be-host').onclick = () => {
+      showTimeLimitPicker(() => {
+        UI.showScreen('nearby');
+        $('nearby-roles').classList.add('hidden');
+        $('nearby-guest').classList.add('hidden');
+        $('nearby-host').classList.remove('hidden');
+        nearbyStatus('招待コードを作成しています…');
+        ONLINE.manualCreateOffer({
+          ...nearbyHandlers,
+          onConnected: () => {
+            const phases = ENGINE.shufflePhases();
+            ONLINE.send({ t: 'setup', phases });
+            startOnlineGame(phases, true);
+          },
+        }).then(code => {
+          $('nearby-offer').value = code;
+          nearbyStatus('①の招待コードを相手に渡し、相手の②返信コードをここに貼り付けてください。');
+        }).catch(err => {
+          console.error(err);
+          nearbyStatus('招待コードの作成に失敗しました。もう一度お試しください。', true);
+        });
+      }, 'nearby');
+    };
+
+    $('nearby-be-guest').onclick = () => {
+      $('nearby-roles').classList.add('hidden');
+      $('nearby-host').classList.add('hidden');
+      $('nearby-guest').classList.remove('hidden');
+      nearbyStatus('相手の①招待コードを貼り付けて「返信コードを作る」を押してください。');
+    };
+
+    $('nearby-make-answer').onclick = () => {
+      const code = $('nearby-offer-in').value.trim();
+      if (!code) { nearbyStatus('招待コードを貼り付けてください。', true); return; }
+      nearbyStatus('返信コードを作成しています…');
+      ONLINE.manualAcceptOffer({
+        ...nearbyHandlers,
+        onConnected: () => nearbyStatus('接続しました。ホストの準備を待っています…'),
+      }, code).then(answer => {
+        $('nearby-answer').value = answer;
+        nearbyStatus('②の返信コードをホストに渡してください。ホスト側が取り込むと対戦が始まります。');
+      }).catch(err => {
+        console.error(err);
+        nearbyStatus('招待コードを読み取れませんでした。コードを確認してください。', true);
+      });
+    };
+
+    $('nearby-connect').onclick = () => {
+      const code = $('nearby-answer-in').value.trim();
+      if (!code) { nearbyStatus('相手の返信コードを貼り付けてください。', true); return; }
+      nearbyStatus('接続しています…');
+      ONLINE.manualAcceptAnswer(code).catch(err => {
+        console.error(err);
+        nearbyStatus('返信コードを読み取れませんでした。コードを確認してください。', true);
+      });
+    };
+
+    $('nearby-copy-offer').onclick = () => copyToClipboard($('nearby-offer').value, $('nearby-copy-offer'));
+    $('nearby-copy-answer').onclick = () => copyToClipboard($('nearby-answer').value, $('nearby-copy-answer'));
+  }
+
   // ---------- イベント配線 ----------
   document.addEventListener('click', e => {
     const action = e.target.closest('[data-action]')?.dataset.action;
@@ -433,6 +531,12 @@
       case 'cpu-hard': showTimeLimitPicker(() => startCpuGame('hard')); break;
       case 'story': showStoryScreen(); break;
       case 'online': setupLobby(); UI.showScreen('lobby'); break;
+      case 'nearby': setupNearby(); UI.showScreen('nearby'); break;
+      case 'nearby-back':
+        if (G.mode !== 'online') ONLINE.close(); // 対戦開始前の握手を破棄（開始後はback-titleが処理）
+        setupLobby();
+        UI.showScreen('lobby');
+        break;
       case 'timelimit-back':
         pendingTimeLimitCallback = null;
         UI.showScreen(pendingTimeLimitCancelScreen);
