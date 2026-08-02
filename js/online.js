@@ -185,13 +185,136 @@ const ONLINE = (() => {
     return h === theirCommitHash;
   }
 
+  // ---------- サーバーレス手動シグナリング（近くの人と対戦）----------
+  // 公開ブローカー(0.peerjs.com)を介さず、offer/answer(SDP)を人手で受け渡して直結する。
+  // 握手がブローカーに依存しないため、ブローカーが落ちていても繋がり、
+  // 同一LANなら host候補で直結できる（＝近くにいれば安定して繋がる）。
+  let mpc = null; // 手動モードの RTCPeerConnection
+
+  // 生の RTCDataChannel を PeerJS の DataConnection 相当（.open/.send(obj)/.close()）に見せる。
+  function wireRawChannel(dc) {
+    const adapter = {
+      open: false,
+      send: obj => { try { dc.send(JSON.stringify(obj)); } catch (_) {} },
+      close: () => { try { dc.close(); } catch (_) {} },
+    };
+    conn = adapter;
+    dc.onopen = () => { adapter.open = true; handlers.onConnected?.(); };
+    dc.onclose = () => handlers.onDisconnect?.();
+    dc.onerror = () => handlers.onDisconnect?.();
+    dc.onmessage = ev => {
+      let msg; try { msg = JSON.parse(ev.data); } catch (_) { return; }
+      if (typeof msg === 'object' && msg !== null) handlers.onMessage?.(msg);
+    };
+  }
+
+  // ICE候補の収集完了を待って完全なSDPを得る（非トリクル）。LANのhost候補は即集まる。
+  function waitIceComplete(pc) {
+    return new Promise(resolve => {
+      if (pc.iceGatheringState === 'complete') return resolve();
+      let done = false;
+      const finish = () => {
+        if (done) return; done = true;
+        pc.removeEventListener('icegatheringstatechange', check);
+        resolve();
+      };
+      const check = () => { if (pc.iceGatheringState === 'complete') finish(); };
+      pc.addEventListener('icegatheringstatechange', check);
+      setTimeout(finish, 3000); // 3秒で候補収集を打ち切り、集まった分でコードを作る
+    });
+  }
+
+  // SDPをgzip圧縮してURL安全なコードにする（未対応環境は無圧縮でフォールバック）。
+  const SIGNAL_PREFIX = 'TF';
+  function b64urlFromBytes(bytes) {
+    let bin = '';
+    for (const b of bytes) bin += String.fromCharCode(b);
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  function b64urlToBytes(s) {
+    s = s.replace(/-/g, '+').replace(/_/g, '/');
+    const bin = atob(s);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+  async function packSignal(obj) {
+    const bytes = new TextEncoder().encode(JSON.stringify(obj));
+    if (typeof CompressionStream === 'undefined') return SIGNAL_PREFIX + '0' + b64urlFromBytes(bytes);
+    const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream('gzip'));
+    const packed = new Uint8Array(await new Response(stream).arrayBuffer());
+    return SIGNAL_PREFIX + '1' + b64urlFromBytes(packed);
+  }
+  async function unpackSignal(code) {
+    code = (code || '').trim();
+    if (!code.startsWith(SIGNAL_PREFIX)) throw new Error('コードの形式が違います');
+    const mode = code[SIGNAL_PREFIX.length];
+    const body = b64urlToBytes(code.slice(SIGNAL_PREFIX.length + 1));
+    let bytes;
+    if (mode === '0') {
+      bytes = body;
+    } else if (mode === '1') {
+      if (typeof DecompressionStream === 'undefined') throw new Error('この端末ではコードを解凍できません');
+      const stream = new Blob([body]).stream().pipeThrough(new DecompressionStream('gzip'));
+      bytes = new Uint8Array(await new Response(stream).arrayBuffer());
+    } else {
+      throw new Error('未知のコード種別です');
+    }
+    return JSON.parse(new TextDecoder().decode(bytes));
+  }
+
+  function newManualPeer() {
+    intentionalClose = false;
+    try { mpc?.close(); } catch (_) {}
+    mpc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+    mpc.onconnectionstatechange = () => {
+      const st = mpc?.connectionState;
+      console.info('[tsukifuda/online] manual PC:', st);
+      if (st === 'failed') handlers.onError?.({ type: 'connect-timeout' });
+    };
+    return mpc;
+  }
+
+  // ホスト: 招待コード(offer)を作る
+  async function manualCreateOffer(h) {
+    handlers = h;
+    const pc = newManualPeer();
+    wireRawChannel(pc.createDataChannel('game', { ordered: true }));
+    await pc.setLocalDescription(await pc.createOffer());
+    await waitIceComplete(pc);
+    return packSignal({ t: 'offer', sdp: pc.localDescription.sdp });
+  }
+  // ホスト: 相手の返信コード(answer)を取り込んで接続を確立する
+  async function manualAcceptAnswer(code) {
+    const sig = await unpackSignal(code);
+    if (sig?.t !== 'answer' || typeof sig.sdp !== 'string') throw new Error('返信コードではありません');
+    if (!mpc) throw new Error('招待の状態が失われています');
+    await mpc.setRemoteDescription({ type: 'answer', sdp: sig.sdp });
+  }
+  // ゲスト: 招待コード(offer)を取り込み、返信コード(answer)を作る
+  async function manualAcceptOffer(h, code) {
+    handlers = h;
+    const sig = await unpackSignal(code);
+    if (sig?.t !== 'offer' || typeof sig.sdp !== 'string') throw new Error('招待コードではありません');
+    const pc = newManualPeer();
+    pc.ondatachannel = ev => wireRawChannel(ev.channel);
+    await pc.setRemoteDescription({ type: 'offer', sdp: sig.sdp });
+    await pc.setLocalDescription(await pc.createAnswer());
+    await waitIceComplete(pc);
+    return packSignal({ t: 'answer', sdp: pc.localDescription.sdp });
+  }
+
   function close() {
     intentionalClose = true; // 以降の 'disconnected' で自動再接続しない
     try { send({ t: 'bye' }); } catch (_) {}
     try { conn?.close(); } catch (_) {}
     try { peer?.destroy(); } catch (_) {}
-    peer = null; conn = null; handlers = {};
+    try { mpc?.close(); } catch (_) {}
+    peer = null; conn = null; mpc = null; handlers = {};
   }
 
-  return { host, join, send, makeCommit, sendReveal, verifyReveal, close };
+  return {
+    host, join, send, makeCommit, sendReveal, verifyReveal, close,
+    manualCreateOffer, manualAcceptAnswer, manualAcceptOffer,
+  };
 })();
