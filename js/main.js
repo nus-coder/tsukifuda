@@ -177,9 +177,21 @@
     });
   }
 
+  // ---------- 計測（GA4） ----------
+  // 対戦開始時にモードを送信。GA4管理画面の「レポート → エンゲージメント → イベント」で
+  // game_start を選ぶと、game_mode 別の回数（どのモードが多く遊ばれたか）を確認できる。
+  function trackGameStart(mode, detail) {
+    if (typeof gtag !== 'function') return; // GA未読込・オフライン端末では無視
+    gtag('event', 'game_start', {
+      game_mode: mode,             // 'cpu' | 'story' | 'online'
+      mode_detail: detail || mode  // 例: 'cpu_novice' / 'cpu_hard' / ボス名 / 'online'
+    });
+  }
+
   // ---------- CPU戦 ----------
   function startCpuGame(level) {
     G.mode = 'cpu'; G.level = level; G.myIndex = 0;
+    trackGameStart('cpu', level === 'hard' ? 'cpu_hard' : 'cpu_novice');
     G.names = ['あなた', level === 'hard' ? 'CPU 大妖怪' : 'CPU 見習い妖怪'];
     G.state = ENGINE.newGame(ENGINE.shufflePhases());
     G.taken = [];
@@ -209,6 +221,7 @@
   function startStoryGame(index) {
     const boss = STORY.BOSSES[index];
     G.mode = 'story'; G.level = boss.ai; G.bossIndex = index; G.myIndex = 0;
+    trackGameStart('story', 'story_' + (boss.name || index));
     G.names = ['あなた', boss.name];
     G.state = ENGINE.newGame(ENGINE.shufflePhases(boss.pool || undefined), boss.pot);
     G.taken = [];
@@ -284,6 +297,7 @@
 
   function startOnlineGame(phases, asHost) {
     G.mode = 'online';
+    trackGameStart('online', asHost ? 'online_host' : 'online_guest');
     G.myIndex = asHost ? 0 : 1;
     G.names = ['あなた', '相手'];
     G.state = ENGINE.newGame(phases);
