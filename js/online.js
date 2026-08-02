@@ -75,6 +75,26 @@ const ONLINE = (() => {
     });
     conn.on('close', () => handlers.onDisconnect?.());
     conn.on('error', () => handlers.onDisconnect?.());
+    // 診断ログ: 接続不可(connect-timeout)が broker と ICE(TURN) のどちらで
+    // 止まっているかを切り分けるため、ICEの状態遷移をコンソールに出す。
+    //   'checking' で止まる → NAT越え/TURN側の問題（TURN認証やポート閉塞を疑う）
+    //   'checking' に到達しない → signaling/broker 側の問題
+    // 選択された候補が relay なら TURN 中継が効いている証拠。
+    conn.on('iceStateChanged', state => {
+      console.info('[tsukifuda/online] ICE state:', state);
+      if (state === 'connected' || state === 'completed') {
+        try {
+          conn.peerConnection?.getStats().then(stats => {
+            stats.forEach(r => {
+              if (r.type === 'candidate-pair' && r.state === 'succeeded' && r.nominated) {
+                const local = stats.get(r.localCandidateId);
+                console.info('[tsukifuda/online] selected candidate type:', local?.candidateType);
+              }
+            });
+          });
+        } catch (_) {}
+      }
+    });
   }
 
   // 部屋を作る（ホスト = player0）。合言葉は onReady で通知する。
