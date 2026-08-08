@@ -444,7 +444,9 @@
   function renderNearbyQR(canvasId, text) {
     const canvas = UI.$(canvasId);
     if (typeof QRCode === 'undefined' || !QRCode.toCanvas) { canvas.classList.add('hidden'); return; }
-    QRCode.toCanvas(canvas, text, { width: 240, margin: 1 }, err => {
+    // errorCorrectionLevel:'L' でモジュール数を減らし柄を粗く（読みやすく）、
+    // margin:4 で規格どおりの静音域（余白）を確保、width大きめでカメラが拾いやすくする。
+    QRCode.toCanvas(canvas, text, { errorCorrectionLevel: 'L', width: 320, margin: 4 }, err => {
       if (err) {
         console.error(err);
         canvas.classList.add('hidden');
@@ -477,7 +479,10 @@
       video.srcObject = null;
     };
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      // 高解像度＆背面カメラを要求。細かいQRのモジュールを解像できるようにする。
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+      });
     } catch (e) {
       console.error(e);
       stopNearbyScanner();

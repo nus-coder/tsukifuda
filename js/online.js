@@ -30,6 +30,12 @@ const ONLINE = (() => {
     ...TURN_SERVERS,
   ];
   const PEER_OPTS = { config: { iceServers: ICE_SERVERS } };
+  // 近距離モード(手動シグナリング)はSDPをQRに載せるため、候補数を絞ってQRを軽く（=柄を粗く読みやすく）する。
+  // 同一LANはhost候補で直結できるので、STUN 1系統＋中継用の単一TURNのみに限定する。
+  const MANUAL_ICE_SERVERS = [
+    { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
+    { urls: 'turns:global.relay.metered.ca:443?transport=tcp', username: '62b73ed39560e8136bee9e8c', credential: 'pfEIEXLeecVkYoQd' },
+  ];
   const CONNECT_TIMEOUT = 15000;     // データチャネル確立の待ち時間
   const MAX_BROKER_ATTEMPTS = 3;     // ブローカー登録/接続の作り直し再試行回数
   // 公開ブローカー(0.peerjs.com)の一時的な不調で作り直して良いエラー種別。
@@ -266,7 +272,7 @@ const ONLINE = (() => {
   function newManualPeer() {
     intentionalClose = false;
     try { mpc?.close(); } catch (_) {}
-    mpc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+    mpc = new RTCPeerConnection({ iceServers: MANUAL_ICE_SERVERS });
     mpc.onconnectionstatechange = () => {
       const st = mpc?.connectionState;
       console.info('[tsukifuda/online] manual PC:', st);
