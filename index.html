@@ -12,7 +12,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>ツキフダ 〜月夜の十二番勝負〜</title>
-<link rel="stylesheet" href="css/style.css?v=17">
+<link rel="stylesheet" href="css/style.css?v=18">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='40' fill='%23f5e6a8'/></svg>">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0d0b1e">
@@ -117,10 +117,13 @@
       <button class="btn" id="btn-join">部屋に入る</button>
     </div>
     <p id="lobby-status" class="lobby-status"></p>
-    <div class="lobby-divider">サーバーが不調なときは</div>
-    <div class="lobby-row">
-      <button class="btn" data-action="nearby">近くの人と対戦（サーバー不要）</button>
+
+    <div class="lobby-alt">
+      <p class="lobby-alt-title">🌗 近くの人と対戦</p>
+      <p class="lobby-alt-note">同じ場所にいる相手と、QRを見せ合って直接つなぎます（サーバー不要）。</p>
+      <button class="btn" data-action="nearby">QRで始める</button>
     </div>
+
     <button class="btn btn-sub" data-action="back-title">タイトルへ戻る</button>
   </div>
 </section>
@@ -230,6 +233,15 @@
 
 <div id="fx-overlay" class="fx-overlay"></div>
 
+<!-- 対戦開始演出（試合開始時） -->
+<div id="matchstart" class="matchstart hidden">
+  <div class="matchstart-dim"></div>
+  <div class="matchstart-banner">
+    <span class="matchstart-title">対戦開始</span>
+    <span class="matchstart-vs" id="matchstart-vs"></span>
+  </div>
+</div>
+
 <!-- 大勝負カットイン（賭点5点以上、公開直前） -->
 <div id="cutin" class="cutin hidden">
   <div class="cutin-dim"></div>
@@ -294,9 +306,9 @@
 <script src="js/engine.js?v=14"></script>
 <script src="js/ai.js?v=14"></script>
 <script src="js/story.js?v=14"></script>
-<script src="js/ui.js?v=14"></script>
+<script src="js/ui.js?v=18"></script>
 <script src="js/online.js?v=17"></script>
-<script src="js/main.js?v=17"></script>
+<script src="js/main.js?v=18"></script>
 <script src="js/pwa.js"></script>
 </body>
 </html>

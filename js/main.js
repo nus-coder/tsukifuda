@@ -201,8 +201,8 @@
     UI.hideResult();
     UI.setEmoteBarVisible(false);
     UI.showScreen('game');
-    SOUND.play('start');
-    startRound();
+    // 試合開始演出（「対戦開始」＋対戦カード）を挟んでから第一ラウンドへ
+    UI.showMatchStart(G.names, G.myIndex, () => startRound());
   }
 
   // ---------- ストーリーモード ----------
@@ -309,8 +309,20 @@
     UI.hideResult();
     UI.setEmoteBarVisible(true);
     UI.showScreen('game');
-    SOUND.play('start');
-    startRound();
+    // 試合開始演出（「対戦開始」＋対戦カード）を挟んでから第一ラウンドへ
+    UI.showMatchStart(G.names, G.myIndex, () => startRound());
+  }
+
+  // 接続確立後にホストが制限時間を決め、両者へ配って対戦を開始する。
+  // （繋がるか分からない段階で決めさせず、試合開始の直前に持ってくる）
+  function beginHostMatch(cancelScreen) {
+    G.awaitingStart = true;
+    showTimeLimitPicker(() => {
+      G.awaitingStart = false;
+      const phases = ENGINE.shufflePhases();
+      ONLINE.send({ t: 'setup', phases, timeLimit: choiceTimeLimitS });
+      startOnlineGame(phases, true);
+    }, cancelScreen);
   }
 
   async function confirmOnline() {
@@ -343,6 +355,11 @@
     switch (msg.t) {
       case 'setup': // ゲストのみ受信
         if (Array.isArray(msg.phases) && msg.phases.length === 12) {
+          // ホストが決めた制限時間をこの対戦に反映（ゲスト自身の保存設定は上書きしない）
+          if (TIME_LIMIT_OPTIONS.includes(Number(msg.timeLimit))) {
+            choiceTimeLimitS = Number(msg.timeLimit);
+            syncTimeLimitBtns();
+          }
           startOnlineGame(msg.phases, false);
         }
         break;
@@ -380,7 +397,7 @@
     if (!(G.myRematch && G.theirRematch)) return;
     if (G.myIndex === 0) {
       const phases = ENGINE.shufflePhases();
-      ONLINE.send({ t: 'setup', phases });
+      ONLINE.send({ t: 'setup', phases, timeLimit: choiceTimeLimitS }); // 制限時間は前試合を引き継ぐ
       startOnlineGame(phases, true);
     }
     // ゲストは setup 受信で開始する
@@ -393,24 +410,18 @@
     UI.$('join-code').value = '';
 
     UI.$('btn-host').onclick = () => {
-      showTimeLimitPicker(() => {
-        UI.showScreen('lobby');
-        UI.$('btn-host').disabled = true;
-        lobbyStatus('部屋を準備しています…');
-        ONLINE.host({
-          ...netHandlers,
-          onReady: code => {
-            UI.$('room-code').textContent = code;
-            UI.$('host-info').classList.remove('hidden');
-            lobbyStatus('');
-          },
-          onConnected: () => {
-            const phases = ENGINE.shufflePhases();
-            ONLINE.send({ t: 'setup', phases });
-            startOnlineGame(phases, true);
-          },
-        });
-      }, 'lobby');
+      UI.$('btn-host').disabled = true;
+      lobbyStatus('部屋を準備しています…');
+      ONLINE.host({
+        ...netHandlers,
+        onReady: code => {
+          UI.$('room-code').textContent = code;
+          UI.$('host-info').classList.remove('hidden');
+          lobbyStatus('');
+        },
+        // 相手が接続したら、制限時間を決めて対戦開始
+        onConnected: () => beginHostMatch('lobby'),
+      });
     };
 
     UI.$('btn-join').onclick = () => {
@@ -567,28 +578,22 @@
     }
 
     $('nearby-be-host').onclick = () => {
-      showTimeLimitPicker(() => {
-        UI.showScreen('nearby');
-        $('nearby-roles').classList.add('hidden');
-        $('nearby-guest').classList.add('hidden');
-        $('nearby-host').classList.remove('hidden');
-        nearbyStatus('招待QRを作成しています…');
-        ONLINE.manualCreateOffer({
-          ...nearbyHandlers,
-          onConnected: () => {
-            const phases = ENGINE.shufflePhases();
-            ONLINE.send({ t: 'setup', phases });
-            startOnlineGame(phases, true);
-          },
-        }).then(code => {
-          $('nearby-offer').value = code;
-          renderNearbyQR('nearby-offer-qr', code);
-          nearbyStatus('①の招待QRを相手に見せ、相手の②返信QRを「返信QRをスキャン」で読み取ってください。');
-        }).catch(err => {
-          console.error(err);
-          nearbyStatus('招待コードの作成に失敗しました。もう一度お試しください。', true);
-        });
-      }, 'nearby');
+      $('nearby-roles').classList.add('hidden');
+      $('nearby-guest').classList.add('hidden');
+      $('nearby-host').classList.remove('hidden');
+      nearbyStatus('招待QRを作成しています…');
+      ONLINE.manualCreateOffer({
+        ...nearbyHandlers,
+        // 接続確立後に制限時間を決めて対戦開始
+        onConnected: () => beginHostMatch('nearby'),
+      }).then(code => {
+        $('nearby-offer').value = code;
+        renderNearbyQR('nearby-offer-qr', code);
+        nearbyStatus('①の招待QRを相手に見せ、相手の②返信QRを「返信QRをスキャン」で読み取ってください。');
+      }).catch(err => {
+        console.error(err);
+        nearbyStatus('招待コードの作成に失敗しました。もう一度お試しください。', true);
+      });
     };
 
     $('nearby-be-guest').onclick = () => {
@@ -630,6 +635,12 @@
         break;
       case 'timelimit-back':
         pendingTimeLimitCallback = null;
+        // 接続確立後（開始直前）にキャンセルした場合は接続も破棄し、画面状態を作り直す
+        if (G.awaitingStart) {
+          G.awaitingStart = false;
+          ONLINE.close();
+          if (pendingTimeLimitCancelScreen === 'nearby') setupNearby(); else setupLobby();
+        }
         UI.showScreen(pendingTimeLimitCancelScreen);
         break;
       case 'rules':

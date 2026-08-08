@@ -201,6 +201,25 @@ const UI = (() => {
     }, reduced ? 300 : 3500);
   }
 
+  // ---------- 対戦開始演出 ----------
+  // 試合開始時に「対戦開始」＋対戦カードを一瞬表示してから done() を呼ぶ。
+  function showMatchStart(names, myIndex, done) {
+    const el = $('matchstart');
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const me = names[myIndex] ?? 'あなた';
+    const opp = names[1 - myIndex] ?? '相手';
+    $('matchstart-vs').textContent = `${me}　◈　${opp}`;
+    el.classList.remove('hidden', 'play');
+    void el.offsetWidth;
+    el.classList.add('play');
+    SOUND.play('start');
+    setTimeout(() => {
+      el.classList.remove('play');
+      el.classList.add('hidden');
+      done?.();
+    }, reduced ? 200 : 1400);
+  }
+
   // ---------- ラウンド公開演出 ----------
   // result: ENGINE.resolveRound の result。myIndex 視点で表示。
   function revealRound(result, myIndex, done) {
@@ -510,7 +529,7 @@ const UI = (() => {
   return {
     showScreen, renderGame, markSelected, setHint, setConfirmVisible,
     setOppPicked, setTimerText,
-    revealRound, log, clearLog, showResult, hideResult, renderRules, $,
+    revealRound, showMatchStart, log, clearLog, showResult, hideResult, renderRules, $,
     phaseAmbience, renderEmoteBar, setEmoteBarVisible, showEmote, renderTitleStats,
     setRulesBackLabel, renderStory, showDialogue, decorateStoryResult, floatText,
   };
