@@ -457,6 +457,18 @@
     });
   }
 
+  // QRを全画面で大きく描画して相手が読み取りやすくする（画面タップで閉じる）。
+  function showBigQR(code) {
+    if (!code || typeof QRCode === 'undefined' || !QRCode.toCanvas) return;
+    const overlay = UI.$('nearby-qr-overlay');
+    const px = Math.max(280, Math.min(window.innerWidth, window.innerHeight) - 40);
+    QRCode.toCanvas(UI.$('nearby-qr-big'), code, { errorCorrectionLevel: 'L', width: px, margin: 4 }, err => {
+      if (err) { console.error(err); return; }
+      overlay.classList.remove('hidden');
+    });
+  }
+  function hideBigQR() { UI.$('nearby-qr-overlay').classList.add('hidden'); }
+
   // カメラQRスキャナ。実行中の停止関数を保持し、多重起動や離脱時に確実に止める。
   let activeScanStop = null;
   function stopNearbyScanner() {
@@ -509,6 +521,7 @@
   function setupNearby() {
     const $ = UI.$;
     stopNearbyScanner();
+    hideBigQR();
     $('nearby-roles').classList.remove('hidden');
     $('nearby-host').classList.add('hidden');
     $('nearby-guest').classList.add('hidden');
@@ -592,6 +605,10 @@
     $('nearby-scan-cancel').onclick = () => { stopNearbyScanner(); nearbyStatus('スキャンを中止しました。'); };
     $('nearby-copy-offer').onclick = () => copyToClipboard($('nearby-offer').value, $('nearby-copy-offer'));
     $('nearby-copy-answer').onclick = () => copyToClipboard($('nearby-answer').value, $('nearby-copy-answer'));
+    // QRをタップで全画面拡大（相手が読み取りやすいように）
+    $('nearby-offer-qr').onclick = () => showBigQR($('nearby-offer').value);
+    $('nearby-answer-qr').onclick = () => showBigQR($('nearby-answer').value);
+    $('nearby-qr-overlay').onclick = hideBigQR;
   }
 
   // ---------- イベント配線 ----------
@@ -606,6 +623,7 @@
       case 'nearby': setupNearby(); UI.showScreen('nearby'); break;
       case 'nearby-back':
         stopNearbyScanner();
+        hideBigQR();
         if (G.mode !== 'online') ONLINE.close(); // 対戦開始前の握手を破棄（開始後はback-titleが処理）
         setupLobby();
         UI.showScreen('lobby');

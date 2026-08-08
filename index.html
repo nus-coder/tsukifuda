@@ -12,7 +12,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>ツキフダ 〜月夜の十二番勝負〜</title>
-<link rel="stylesheet" href="css/style.css?v=16">
+<link rel="stylesheet" href="css/style.css?v=17">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='40' fill='%23f5e6a8'/></svg>">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0d0b1e">
@@ -138,8 +138,8 @@
 
     <!-- ホスト側 -->
     <div id="nearby-host" class="nearby-flow hidden">
-      <p class="nearby-step">① この招待QRを相手に見せる</p>
-      <canvas id="nearby-offer-qr" class="qr-canvas hidden"></canvas>
+      <p class="nearby-step">① この招待QRを相手に見せる（タップで拡大）</p>
+      <canvas id="nearby-offer-qr" class="qr-canvas hidden" title="タップで拡大"></canvas>
       <details class="nearby-fallback">
         <summary>QRが使えないときはコードを渡す</summary>
         <textarea id="nearby-offer" class="code-box" readonly placeholder="作成中…"></textarea>
@@ -163,8 +163,8 @@
         <textarea id="nearby-offer-in" class="code-box" placeholder="相手から届いた招待コードを貼り付け"></textarea>
         <button class="btn btn-sub" id="nearby-make-answer">返信コードを作る</button>
       </details>
-      <p class="nearby-step">② この返信QRを相手に見せる</p>
-      <canvas id="nearby-answer-qr" class="qr-canvas hidden"></canvas>
+      <p class="nearby-step">② この返信QRを相手に見せる（タップで拡大）</p>
+      <canvas id="nearby-answer-qr" class="qr-canvas hidden" title="タップで拡大"></canvas>
       <details class="nearby-fallback">
         <summary>QRが使えないときはコードを渡す</summary>
         <textarea id="nearby-answer" class="code-box" readonly placeholder="上のスキャンで作成されます"></textarea>
@@ -180,6 +180,12 @@
       <video id="nearby-video" playsinline muted></video>
       <p class="nearby-scan-hint">相手のQRコードを枠内に映してください</p>
       <button class="btn btn-sub" id="nearby-scan-cancel">スキャンをやめる</button>
+    </div>
+
+    <!-- QR拡大表示（全面オーバーレイ・タップで閉じる） -->
+    <div id="nearby-qr-overlay" class="nearby-qr-overlay hidden">
+      <canvas id="nearby-qr-big" class="qr-big"></canvas>
+      <p class="nearby-scan-hint">相手に読み取ってもらってください（画面をタップで閉じる）</p>
     </div>
   </div>
 </section>
@@ -289,8 +295,8 @@
 <script src="js/ai.js?v=14"></script>
 <script src="js/story.js?v=14"></script>
 <script src="js/ui.js?v=14"></script>
-<script src="js/online.js?v=16"></script>
-<script src="js/main.js?v=16"></script>
+<script src="js/online.js?v=17"></script>
+<script src="js/main.js?v=17"></script>
 <script src="js/pwa.js"></script>
 </body>
 </html>

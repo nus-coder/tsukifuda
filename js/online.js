@@ -230,14 +230,44 @@ const ONLINE = (() => {
     });
   }
 
-  // SDPをgzip圧縮してURL安全なコードにする（未対応環境は無圧縮でフォールバック）。
-  const SIGNAL_PREFIX = 'TF';
-  function b64urlFromBytes(bytes) {
-    let bin = '';
-    for (const b of bytes) bin += String.fromCharCode(b);
-    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  // SDP を gzip 圧縮し、QRの英数モードで効率よく載るコード文字列にする。
+  // 文字集合は QR 英数モードの44文字から空白を除いたもの（＝貼り付けも安全）。
+  // base64(バイトモード)より QR のモジュール数が約2割少なく済み、柄が粗く読みやすい。
+  // コード先頭タグ: TG1=gzip+base44 / TG0=無圧縮+base44（旧 TF*=base64url も一応復号）。
+  const B44 = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ$%*+-./:';
+  function base44FromBytes(bytes) {
+    let out = '';
+    for (let i = 0; i < bytes.length; i += 2) {
+      if (i + 1 < bytes.length) {
+        let x = bytes[i] * 256 + bytes[i + 1];
+        out += B44[x % 44]; x = (x / 44) | 0;
+        out += B44[x % 44]; x = (x / 44) | 0;
+        out += B44[x % 44];
+      } else {
+        let x = bytes[i];
+        out += B44[x % 44]; x = (x / 44) | 0;
+        out += B44[x % 44];
+      }
+    }
+    return out;
   }
-  function b64urlToBytes(s) {
+  function base44ToBytes(s) {
+    const out = [];
+    for (let i = 0; i < s.length; i += 3) {
+      const chunk = s.slice(i, i + 3);
+      let x = 0;
+      for (let j = chunk.length - 1; j >= 0; j--) {
+        const v = B44.indexOf(chunk[j]);
+        if (v < 0) throw new Error('コードに不正な文字があります');
+        x = x * 44 + v;
+      }
+      if (chunk.length === 3) out.push((x >> 8) & 0xff, x & 0xff);
+      else if (chunk.length === 2) { if (x > 0xff) throw new Error('コードが壊れています'); out.push(x & 0xff); }
+      else throw new Error('コード長が不正です');
+    }
+    return new Uint8Array(out);
+  }
+  function b64urlToBytes(s) { // 旧形式(base64url)の後方互換用
     s = s.replace(/-/g, '+').replace(/_/g, '/');
     const bin = atob(s);
     const out = new Uint8Array(bin.length);
@@ -246,25 +276,26 @@ const ONLINE = (() => {
   }
   async function packSignal(obj) {
     const bytes = new TextEncoder().encode(JSON.stringify(obj));
-    if (typeof CompressionStream === 'undefined') return SIGNAL_PREFIX + '0' + b64urlFromBytes(bytes);
+    if (typeof CompressionStream === 'undefined') return 'TG0' + base44FromBytes(bytes);
     const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream('gzip'));
     const packed = new Uint8Array(await new Response(stream).arrayBuffer());
-    return SIGNAL_PREFIX + '1' + b64urlFromBytes(packed);
+    return 'TG1' + base44FromBytes(packed);
   }
   async function unpackSignal(code) {
     code = (code || '').trim();
-    if (!code.startsWith(SIGNAL_PREFIX)) throw new Error('コードの形式が違います');
-    const mode = code[SIGNAL_PREFIX.length];
-    const body = b64urlToBytes(code.slice(SIGNAL_PREFIX.length + 1));
+    const tag = code.slice(0, 3);
+    const body = code.slice(3);
+    let raw, compressed;
+    if (tag === 'TG0' || tag === 'TG1') { raw = base44ToBytes(body); compressed = tag === 'TG1'; }
+    else if (tag === 'TF0' || tag === 'TF1') { raw = b64urlToBytes(body); compressed = tag === 'TF1'; }
+    else throw new Error('コードの形式が違います');
     let bytes;
-    if (mode === '0') {
-      bytes = body;
-    } else if (mode === '1') {
-      if (typeof DecompressionStream === 'undefined') throw new Error('この端末ではコードを解凍できません');
-      const stream = new Blob([body]).stream().pipeThrough(new DecompressionStream('gzip'));
-      bytes = new Uint8Array(await new Response(stream).arrayBuffer());
+    if (!compressed) {
+      bytes = raw;
     } else {
-      throw new Error('未知のコード種別です');
+      if (typeof DecompressionStream === 'undefined') throw new Error('この端末ではコードを解凍できません');
+      const stream = new Blob([raw]).stream().pipeThrough(new DecompressionStream('gzip'));
+      bytes = new Uint8Array(await new Response(stream).arrayBuffer());
     }
     return JSON.parse(new TextDecoder().decode(bytes));
   }
