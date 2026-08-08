@@ -367,6 +367,12 @@ body:not([data-screen="game"]) #btn-pause { visibility: hidden; }
   padding: 40px 56px; text-align: center;
   box-shadow: 0 0 60px rgba(232, 201, 62, .25);
 }
+/* 制限時間ポップ：盤面を薄暗くフェードした上に出す（=対戦成立を見せる） */
+.tl-pop { background: rgba(8, 6, 20, .6); backdrop-filter: blur(2px); z-index: 12; }
+.tl-pop-card { padding: 26px 30px; max-width: min(92vw, 380px); }
+.tl-pop-card h2 { color: var(--gold); font-size: 26px; letter-spacing: .18em; margin-bottom: 8px; }
+.tl-pop-card > p { margin-bottom: 18px; }
+.tl-pop-card .timelimit-options { margin-bottom: 14px; }
 .result-panel h2 { font-size: 34px; color: var(--moon); letter-spacing: .2em; margin-bottom: 12px; }
 .result-panel p { color: var(--ink); margin-bottom: 26px; font-size: 15px; }
 .result-story-msg { max-width: 420px; line-height: 1.9; color: var(--moon) !important; }

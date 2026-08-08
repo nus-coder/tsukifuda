@@ -275,6 +275,15 @@
 
   function abortOnline(message) {
     if (G.mode !== 'online') return;
+    if (!G.roundsStarted) {
+      // 対戦成立前（制限時間ポップ表示中など）の切断は勝敗に記録しない
+      UI.$('timelimit-pop').classList.add('hidden');
+      ONLINE.close();
+      G.mode = null;
+      alert(message);
+      UI.showScreen('title');
+      return;
+    }
     if (G.state?.finished) {
       // 結果画面は表示済み（または表示中）: 演出・記録はそのまま進行させ、切断だけ処理する
       ONLINE.close();
@@ -295,8 +304,11 @@
     UI.showScreen('title');
   }
 
-  function startOnlineGame(phases, asHost) {
+  // 盤面を用意して表示する（まだラウンドは始めない＝プレビュー）。
+  // 「対戦成立後に制限時間を選ぶ」ため、開始とプレビューを分離している。
+  function prepareOnlineGame(phases, asHost) {
     G.mode = 'online';
+    G.roundsStarted = false;
     trackGameStart('online', asHost ? 'online_host' : 'online_guest');
     G.myIndex = asHost ? 0 : 1;
     G.names = ['あなた', '相手'];
@@ -309,20 +321,56 @@
     UI.hideResult();
     UI.setEmoteBarVisible(true);
     UI.showScreen('game');
-    // 試合開始演出（「対戦開始」＋対戦カード）を挟んでから第一ラウンドへ
+    UI.renderGame(view(), { locked: true }); // 盤面プレビュー（操作不可）
+  }
+
+  // 対戦開始演出を挟んで第一ラウンドへ。
+  function beginOnlineRounds() {
+    G.roundsStarted = true;
     UI.showMatchStart(G.names, G.myIndex, () => startRound());
   }
 
-  // 接続確立後にホストが制限時間を決め、両者へ配って対戦を開始する。
-  // （繋がるか分からない段階で決めさせず、試合開始の直前に持ってくる）
+  // ゲスト・再戦は用意→開始を一気に行う。
+  function startOnlineGame(phases, asHost) {
+    prepareOnlineGame(phases, asHost);
+    beginOnlineRounds();
+  }
+
+  // 接続確立後、ホストは「対戦成立」した盤面を薄暗く見せた上に制限時間ポップを出し、
+  // 決めたら両者へ配って対戦を開始する（繋がるか不明な段階で決めさせない）。
   function beginHostMatch(cancelScreen) {
-    G.awaitingStart = true;
-    showTimeLimitPicker(() => {
-      G.awaitingStart = false;
-      const phases = ENGINE.shufflePhases();
-      ONLINE.send({ t: 'setup', phases, timeLimit: choiceTimeLimitS });
-      startOnlineGame(phases, true);
-    }, cancelScreen);
+    const phases = ENGINE.shufflePhases();
+    prepareOnlineGame(phases, true); // 盤面プレビューを表示
+    showTimeLimitPopup(
+      () => { // 決定
+        ONLINE.send({ t: 'setup', phases, timeLimit: choiceTimeLimitS });
+        beginOnlineRounds();
+      },
+      () => { // やめる：接続を破棄してロビー/近距離へ戻る
+        ONLINE.close();
+        G.mode = null;
+        if (cancelScreen === 'nearby') setupNearby(); else setupLobby();
+        UI.showScreen(cancelScreen);
+      },
+    );
+  }
+
+  // 制限時間ポップ（オンライン専用）。盤面の上に薄暗いオーバーレイで表示する。
+  function showTimeLimitPopup(onPick, onCancel) {
+    const pop = UI.$('timelimit-pop');
+    document.querySelectorAll('#timelimit-pop-options .btn').forEach(b => {
+      b.classList.toggle('selected', Number(b.dataset.tl) === choiceTimeLimitS);
+      b.onclick = () => {
+        choiceTimeLimitS = Number(b.dataset.tl);
+        localStorage.setItem(TIME_LIMIT_KEY, String(choiceTimeLimitS));
+        syncTimeLimitBtns();
+        SOUND.play('click');
+        pop.classList.add('hidden');
+        onPick();
+      };
+    });
+    UI.$('timelimit-pop-cancel').onclick = () => { pop.classList.add('hidden'); onCancel(); };
+    pop.classList.remove('hidden');
   }
 
   async function confirmOnline() {
@@ -635,12 +683,6 @@
         break;
       case 'timelimit-back':
         pendingTimeLimitCallback = null;
-        // 接続確立後（開始直前）にキャンセルした場合は接続も破棄し、画面状態を作り直す
-        if (G.awaitingStart) {
-          G.awaitingStart = false;
-          ONLINE.close();
-          if (pendingTimeLimitCancelScreen === 'nearby') setupNearby(); else setupLobby();
-        }
         UI.showScreen(pendingTimeLimitCancelScreen);
         break;
       case 'rules':

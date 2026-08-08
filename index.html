@@ -12,7 +12,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>ツキフダ 〜月夜の十二番勝負〜</title>
-<link rel="stylesheet" href="css/style.css?v=18">
+<link rel="stylesheet" href="css/style.css?v=19">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='40' fill='%23f5e6a8'/></svg>">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0d0b1e">
@@ -268,6 +268,21 @@
 </div>
 
 <!-- 中断メニュー -->
+<!-- 制限時間ポップ（オンライン: 対戦成立後、盤面の上に薄暗く表示） -->
+<div id="timelimit-pop" class="overlay tl-pop hidden">
+  <div class="result-panel tl-pop-card">
+    <h2>対戦成立</h2>
+    <p>カード選択の持ち時間を決めてください</p>
+    <div class="timelimit-options" id="timelimit-pop-options">
+      <button class="btn" data-tl="10">10秒</button>
+      <button class="btn" data-tl="20">20秒</button>
+      <button class="btn" data-tl="40">40秒</button>
+      <button class="btn" data-tl="0">なし</button>
+    </div>
+    <button class="btn btn-sub" id="timelimit-pop-cancel">やめる</button>
+  </div>
+</div>
+
 <div id="pause-overlay" class="overlay hidden">
   <div class="result-panel pause-panel">
     <h2>ひとやすみ</h2>
@@ -308,7 +323,7 @@
 <script src="js/story.js?v=14"></script>
 <script src="js/ui.js?v=18"></script>
 <script src="js/online.js?v=17"></script>
-<script src="js/main.js?v=18"></script>
+<script src="js/main.js?v=19"></script>
 <script src="js/pwa.js"></script>
 </body>
 </html>
