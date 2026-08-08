@@ -12,7 +12,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>ツキフダ 〜月夜の十二番勝負〜</title>
-<link rel="stylesheet" href="css/style.css?v=14">
+<link rel="stylesheet" href="css/style.css?v=15">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='40' fill='%23f5e6a8'/></svg>">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0d0b1e">
@@ -138,26 +138,49 @@
 
     <!-- ホスト側 -->
     <div id="nearby-host" class="nearby-flow hidden">
-      <p class="nearby-step">① この招待コードを相手に渡す</p>
-      <textarea id="nearby-offer" class="code-box" readonly placeholder="作成中…"></textarea>
-      <button class="btn btn-sub" id="nearby-copy-offer">招待コードをコピー</button>
-      <p class="nearby-step">② 相手の返信コードを貼り付ける</p>
-      <textarea id="nearby-answer-in" class="code-box" placeholder="相手から届いた返信コードを貼り付け"></textarea>
-      <button class="btn" id="nearby-connect">接続する</button>
+      <p class="nearby-step">① この招待QRを相手に見せる</p>
+      <canvas id="nearby-offer-qr" class="qr-canvas hidden"></canvas>
+      <details class="nearby-fallback">
+        <summary>QRが使えないときはコードを渡す</summary>
+        <textarea id="nearby-offer" class="code-box" readonly placeholder="作成中…"></textarea>
+        <button class="btn btn-sub" id="nearby-copy-offer">招待コードをコピー</button>
+      </details>
+      <p class="nearby-step">② 相手の返信QRを読み取る</p>
+      <button class="btn" id="nearby-scan-answer">返信QRをスキャン</button>
+      <details class="nearby-fallback">
+        <summary>QRが使えないときはコードを貼り付け</summary>
+        <textarea id="nearby-answer-in" class="code-box" placeholder="相手から届いた返信コードを貼り付け"></textarea>
+        <button class="btn btn-sub" id="nearby-connect">接続する</button>
+      </details>
     </div>
 
     <!-- ゲスト側 -->
     <div id="nearby-guest" class="nearby-flow hidden">
-      <p class="nearby-step">① 相手の招待コードを貼り付ける</p>
-      <textarea id="nearby-offer-in" class="code-box" placeholder="相手から届いた招待コードを貼り付け"></textarea>
-      <button class="btn" id="nearby-make-answer">返信コードを作る</button>
-      <p class="nearby-step">② この返信コードを相手に渡す</p>
-      <textarea id="nearby-answer" class="code-box" readonly placeholder="上のボタンで作成されます"></textarea>
-      <button class="btn btn-sub" id="nearby-copy-answer">返信コードをコピー</button>
+      <p class="nearby-step">① 相手の招待QRを読み取る</p>
+      <button class="btn" id="nearby-scan-offer">招待QRをスキャン</button>
+      <details class="nearby-fallback">
+        <summary>QRが使えないときはコードを貼り付け</summary>
+        <textarea id="nearby-offer-in" class="code-box" placeholder="相手から届いた招待コードを貼り付け"></textarea>
+        <button class="btn btn-sub" id="nearby-make-answer">返信コードを作る</button>
+      </details>
+      <p class="nearby-step">② この返信QRを相手に見せる</p>
+      <canvas id="nearby-answer-qr" class="qr-canvas hidden"></canvas>
+      <details class="nearby-fallback">
+        <summary>QRが使えないときはコードを渡す</summary>
+        <textarea id="nearby-answer" class="code-box" readonly placeholder="上のスキャンで作成されます"></textarea>
+        <button class="btn btn-sub" id="nearby-copy-answer">返信コードをコピー</button>
+      </details>
     </div>
 
     <p id="nearby-status" class="lobby-status"></p>
     <button class="btn btn-sub" data-action="nearby-back">戻る</button>
+
+    <!-- カメラQRスキャナ（全面オーバーレイ） -->
+    <div id="nearby-scanner" class="nearby-scanner hidden">
+      <video id="nearby-video" playsinline muted></video>
+      <p class="nearby-scan-hint">相手のQRコードを枠内に映してください</p>
+      <button class="btn btn-sub" id="nearby-scan-cancel">スキャンをやめる</button>
+    </div>
   </div>
 </section>
 
@@ -256,6 +279,9 @@
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"
         integrity="sha384-nlUQ8ZqCbvStErob+biJNzSgltf6urV3VGqhfIfzhmg9RXmpeRm76ELw0pYnKlTR"
         crossorigin="anonymous"></script>
+<!-- QRコード生成／読み取り（近くの人と対戦モード用）。未読込でもコード貼り付けで代替可能。 -->
+<script src="https://unpkg.com/qrcode@1.5.4/build/qrcode.min.js"></script>
+<script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js"></script>
 <script src="js/cards.js?v=14"></script>
 <script src="js/sound.js?v=14"></script>
 <script src="js/fx.js?v=14"></script>
@@ -264,7 +290,7 @@
 <script src="js/story.js?v=14"></script>
 <script src="js/ui.js?v=14"></script>
 <script src="js/online.js?v=14"></script>
-<script src="js/main.js?v=14"></script>
+<script src="js/main.js?v=15"></script>
 <script src="js/pwa.js"></script>
 </body>
 </html>

@@ -440,15 +440,75 @@
     }).catch(() => nearbyStatus('コピーできませんでした。長押しで選択してコピーしてください。', true));
   }
 
+  // QRコードをcanvasに描画（ライブラリ未読込やサイズ超過時はフォールバック案内）。
+  function renderNearbyQR(canvasId, text) {
+    const canvas = UI.$(canvasId);
+    if (typeof QRCode === 'undefined' || !QRCode.toCanvas) { canvas.classList.add('hidden'); return; }
+    QRCode.toCanvas(canvas, text, { width: 240, margin: 1 }, err => {
+      if (err) {
+        console.error(err);
+        canvas.classList.add('hidden');
+        nearbyStatus('QRの生成に失敗しました。下の「コードを渡す」から手動でお渡しください。', true);
+      } else {
+        canvas.classList.remove('hidden');
+      }
+    });
+  }
+
+  // カメラQRスキャナ。実行中の停止関数を保持し、多重起動や離脱時に確実に止める。
+  let activeScanStop = null;
+  function stopNearbyScanner() {
+    if (activeScanStop) { try { activeScanStop(); } catch (_) {} activeScanStop = null; }
+    UI.$('nearby-scanner').classList.add('hidden');
+  }
+  async function startNearbyScanner(onResult) {
+    if (typeof jsQR === 'undefined') { nearbyStatus('QR読み取りが使えません。「コードを貼り付け」をご利用ください。', true); return; }
+    if (!navigator.mediaDevices?.getUserMedia) { nearbyStatus('この端末ではカメラを使えません。「コードを貼り付け」をご利用ください。', true); return; }
+    stopNearbyScanner();
+    const video = UI.$('nearby-video');
+    UI.$('nearby-scanner').classList.remove('hidden');
+    const cvs = document.createElement('canvas');
+    const ctx = cvs.getContext('2d', { willReadFrequently: true });
+    let stream = null, raf = 0, stopped = false;
+    activeScanStop = () => {
+      stopped = true;
+      if (raf) cancelAnimationFrame(raf);
+      stream?.getTracks().forEach(t => t.stop());
+      video.srcObject = null;
+    };
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    } catch (e) {
+      console.error(e);
+      stopNearbyScanner();
+      nearbyStatus('カメラを起動できませんでした。権限を許可するか、「コードを貼り付け」をご利用ください。', true);
+      return;
+    }
+    if (stopped) { stream.getTracks().forEach(t => t.stop()); return; } // 起動待ちの間に中断された
+    video.srcObject = stream;
+    await video.play().catch(() => {});
+    const tick = () => {
+      if (stopped) return;
+      if (video.readyState >= video.HAVE_ENOUGH_DATA && video.videoWidth) {
+        cvs.width = video.videoWidth; cvs.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0, cvs.width, cvs.height);
+        const img = ctx.getImageData(0, 0, cvs.width, cvs.height);
+        const found = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+        if (found && found.data) { stopNearbyScanner(); onResult(found.data.trim()); return; }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+  }
+
   function setupNearby() {
     const $ = UI.$;
+    stopNearbyScanner();
     $('nearby-roles').classList.remove('hidden');
     $('nearby-host').classList.add('hidden');
     $('nearby-guest').classList.add('hidden');
-    $('nearby-offer').value = '';
-    $('nearby-answer-in').value = '';
-    $('nearby-offer-in').value = '';
-    $('nearby-answer').value = '';
+    ['nearby-offer', 'nearby-answer-in', 'nearby-offer-in', 'nearby-answer'].forEach(id => { $(id).value = ''; });
+    ['nearby-offer-qr', 'nearby-answer-qr'].forEach(id => $(id).classList.add('hidden'));
     nearbyStatus('');
 
     // 握手中のエラーはロビーではなくこの画面に出す
@@ -461,13 +521,40 @@
       },
     };
 
+    // ゲスト: 招待(offer)を取り込み、返信(answer)QR/コードを作る
+    function makeAnswer(code) {
+      if (!code) { nearbyStatus('招待QRを読み取るか、招待コードを貼り付けてください。', true); return; }
+      nearbyStatus('返信コードを作成しています…');
+      ONLINE.manualAcceptOffer({
+        ...nearbyHandlers,
+        onConnected: () => nearbyStatus('接続しました。ホストの準備を待っています…'),
+      }, code).then(answer => {
+        $('nearby-answer').value = answer;
+        renderNearbyQR('nearby-answer-qr', answer);
+        nearbyStatus('②の返信QRをホストに見せてください。ホストが読み取ると対戦が始まります。');
+      }).catch(err => {
+        console.error(err);
+        nearbyStatus('招待コードを読み取れませんでした。QR/コードを確認してください。', true);
+      });
+    }
+
+    // ホスト: 返信(answer)を取り込み接続を確立
+    function doConnect(code) {
+      if (!code) { nearbyStatus('返信QRを読み取るか、返信コードを貼り付けてください。', true); return; }
+      nearbyStatus('接続しています…');
+      ONLINE.manualAcceptAnswer(code).catch(err => {
+        console.error(err);
+        nearbyStatus('返信コードを読み取れませんでした。QR/コードを確認してください。', true);
+      });
+    }
+
     $('nearby-be-host').onclick = () => {
       showTimeLimitPicker(() => {
         UI.showScreen('nearby');
         $('nearby-roles').classList.add('hidden');
         $('nearby-guest').classList.add('hidden');
         $('nearby-host').classList.remove('hidden');
-        nearbyStatus('招待コードを作成しています…');
+        nearbyStatus('招待QRを作成しています…');
         ONLINE.manualCreateOffer({
           ...nearbyHandlers,
           onConnected: () => {
@@ -477,7 +564,8 @@
           },
         }).then(code => {
           $('nearby-offer').value = code;
-          nearbyStatus('①の招待コードを相手に渡し、相手の②返信コードをここに貼り付けてください。');
+          renderNearbyQR('nearby-offer-qr', code);
+          nearbyStatus('①の招待QRを相手に見せ、相手の②返信QRを「返信QRをスキャン」で読み取ってください。');
         }).catch(err => {
           console.error(err);
           nearbyStatus('招待コードの作成に失敗しました。もう一度お試しください。', true);
@@ -489,35 +577,14 @@
       $('nearby-roles').classList.add('hidden');
       $('nearby-host').classList.add('hidden');
       $('nearby-guest').classList.remove('hidden');
-      nearbyStatus('相手の①招待コードを貼り付けて「返信コードを作る」を押してください。');
+      nearbyStatus('「招待QRをスキャン」で相手の招待QRを読み取ってください。');
     };
 
-    $('nearby-make-answer').onclick = () => {
-      const code = $('nearby-offer-in').value.trim();
-      if (!code) { nearbyStatus('招待コードを貼り付けてください。', true); return; }
-      nearbyStatus('返信コードを作成しています…');
-      ONLINE.manualAcceptOffer({
-        ...nearbyHandlers,
-        onConnected: () => nearbyStatus('接続しました。ホストの準備を待っています…'),
-      }, code).then(answer => {
-        $('nearby-answer').value = answer;
-        nearbyStatus('②の返信コードをホストに渡してください。ホスト側が取り込むと対戦が始まります。');
-      }).catch(err => {
-        console.error(err);
-        nearbyStatus('招待コードを読み取れませんでした。コードを確認してください。', true);
-      });
-    };
-
-    $('nearby-connect').onclick = () => {
-      const code = $('nearby-answer-in').value.trim();
-      if (!code) { nearbyStatus('相手の返信コードを貼り付けてください。', true); return; }
-      nearbyStatus('接続しています…');
-      ONLINE.manualAcceptAnswer(code).catch(err => {
-        console.error(err);
-        nearbyStatus('返信コードを読み取れませんでした。コードを確認してください。', true);
-      });
-    };
-
+    $('nearby-scan-offer').onclick = () => startNearbyScanner(code => { $('nearby-offer-in').value = code; makeAnswer(code); });
+    $('nearby-scan-answer').onclick = () => startNearbyScanner(code => { $('nearby-answer-in').value = code; doConnect(code); });
+    $('nearby-make-answer').onclick = () => makeAnswer($('nearby-offer-in').value.trim());
+    $('nearby-connect').onclick = () => doConnect($('nearby-answer-in').value.trim());
+    $('nearby-scan-cancel').onclick = () => { stopNearbyScanner(); nearbyStatus('スキャンを中止しました。'); };
     $('nearby-copy-offer').onclick = () => copyToClipboard($('nearby-offer').value, $('nearby-copy-offer'));
     $('nearby-copy-answer').onclick = () => copyToClipboard($('nearby-answer').value, $('nearby-copy-answer'));
   }
@@ -533,6 +600,7 @@
       case 'online': setupLobby(); UI.showScreen('lobby'); break;
       case 'nearby': setupNearby(); UI.showScreen('nearby'); break;
       case 'nearby-back':
+        stopNearbyScanner();
         if (G.mode !== 'online') ONLINE.close(); // 対戦開始前の握手を破棄（開始後はback-titleが処理）
         setupLobby();
         UI.showScreen('lobby');
@@ -553,6 +621,7 @@
         break;
       case 'back-title':
         stopChoiceTimer();
+        stopNearbyScanner();
         if (G.mode === 'online') { ONLINE.close(); G.mode = null; }
         UI.hideResult();
         UI.$('btn-host').disabled = false;
